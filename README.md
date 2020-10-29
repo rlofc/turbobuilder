@@ -4,6 +4,8 @@
 
 An experimental 80's inspired data entry and retrieval tool.
 
+![TURBUBUILDER GIF](/art/merchant.gif)
+
 ## Declarative Application Development
 
 TURBOBUILDER is a declarative, model-driven, single-user application generator.

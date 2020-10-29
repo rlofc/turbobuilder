@@ -2,8 +2,8 @@ Customer = entity {
     Name = field { type: text; size: 12; listed: true; }
     Address = field { type: text; size: 30; }
     Contact = field { type: text; size: 15; }
-    Phone = field { type: text; size: 12; }
-    Orders = relation { ref: Order.Customerz; }
+    Phone = field { type: text; size: 14; }
+    Orders = relation { ref: Order.Customers; sortby: Order.Date; }
     Volume = field { type: auto; size: 9; listed: false; 
         value: Sum(Orders.Cost);
     }
@@ -14,8 +14,8 @@ Customer = entity {
 
 Order = entity {
     OrderId = field { type: text; size: 8; listed: true; }
-    Customerz = field { ref: Customer.Name; size: 12; listed: true; }
-    Date = field { type: text; size: 12; } 
+    Customers = field { ref: Customer.Name; size: 12; listed: true; }
+    Date = field { type: date; size: 12; listed: true; } 
     Items = relation { ref: OrderItem.Order; }
     Cost = field { type: auto; size: 9; listed: false; 
         value: Sum(Items.Cost);
@@ -25,17 +25,13 @@ Order = entity {
 Item = entity {
     Name = field { type: text; size: 20; listed: true; }
     Price = field { type: integer; size: 7; listed: true; }
-    Quantity = field { type: text; size: 5; listed: true; }
-    Stock = field { type: auto; size: 5; listed: false; 
+    Stock = field { type: auto; size: 5; listed: false; format: "%.0f";
         value: Sum(Inventory.Stock);
     }
-    Reserved = field { type: auto; size: 5; listed: false; 
-        value: Sub(Quantity, Sum(Orders.Quantity));
-    }
-    Remaining = field { type: auto; size: 5; listed: false; 
+    Remaining = field { type: auto; size: 5; listed: false; format: "%.0f";
         value: Sub(Stock, Sum(Orders.Quantity));
     }
-    Warehouses = field { type: auto; size: 5; listed: false; 
+    Warehouses = field { type: auto; size: 5; listed: false; format: "%.0f";
         value: Count(Inventory.Item);
     }
     Orders = relation { ref: OrderItem.Item; }

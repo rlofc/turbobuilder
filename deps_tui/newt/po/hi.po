@@ -1,0 +1,36 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+msgid ""
+msgstr ""
+"Project-Id-Version: newt\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2016-03-23 15:59+0100\n"
+"PO-Revision-Date: 2004-11-20 01:53-0500\n"
+"Last-Translator: Ravishankar Shrivastava <raviratlami@gmail.com>\n"
+"Language-Team: Ravishankar Shrivastava <raviratlami@yahoo.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: hi\n"
+"Plural-Forms: 2\n"
+"X-Generator: Zanata 3.8.2\n"
+"X-Poedit-Country: INDIA\n"
+"X-Poedit-Language: Hindi\n"
+
+#: ../dialogboxes.c:49
+msgid "Ok"
+msgstr "à à@àU"
+
+#: ../dialogboxes.c:50
+msgid "Cancel"
+msgstr "रदàMद"
+
+#: ../dialogboxes.c:51
+msgid "Yes"
+msgstr "हाàA"
+
+#: ../dialogboxes.c:52
+msgid "No"
+msgstr "नहà@àB"

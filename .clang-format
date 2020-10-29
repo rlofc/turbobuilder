@@ -1,0 +1,18 @@
+﻿---
+BasedOnStyle: Mozilla
+AlignAfterOpenBracket: Align
+AlignConsecutiveDeclarations: 'true'
+AlignConsecutiveAssignments: 'true'
+AlignOperands: 'true'
+AllowAllArgumentsOnNextLine: 'true'
+AllowShortBlocksOnASingleLine: 'false'
+AllowShortIfStatementsOnASingleLine: Always
+AllowShortLoopsOnASingleLine: 'false'
+AlwaysBreakAfterReturnType: All
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+BreakBeforeBraces: Mozilla
+IndentWidth: '4'
+TabWidth: '4'
+
+...

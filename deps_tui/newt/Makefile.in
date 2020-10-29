@@ -1,0 +1,184 @@
+LIBS = -lslang @LIBS@
+LIBTCL = @TCL_LIB_FLAG@
+
+CC = @CC@
+CPP = @CPP@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
+CPPFLAGS = -D_GNU_SOURCE @CPPFLAGS@
+GNU_LD = @GNU_LD@
+
+VERSION = @VERSION@
+TAG = r$(subst .,-,$(VERSION))
+SONAME = @SONAME@
+SOEXT = so
+
+PYTHONVERS = @PYTHONVERS@
+WHIPTCLLIB = @WHIPTCLLIB@
+ifneq ($(WHIPTCLLIB),)
+WHIPTCLSO = $(WHIPTCLLIB).$(SOEXT)
+else
+WHIPTCLSO =
+endif
+
+PROGS = test whiptail $(WHIPTCLSO) testgrid testtree showchars showkey
+TESTOBJS = test.o testgrid.o testtree.o showchars.o showkey.o
+NDIALOGOBJS = whiptail.o dialogboxes.o
+WHIPTCLOBJS = shared/whiptcl.o shared/dialogboxes.o
+LIBNEWT = libnewt.a
+LIBNEWTSH = libnewt.$(SOEXT).$(VERSION)
+LIBNEWTSONAME = libnewt.$(SOEXT).$(SONAME)
+LIBOBJS = newt.o button.o form.o checkbox.o entry.o label.o listbox.o \
+          scrollbar.o textbox.o scale.o grid.o windows.o buttonbar.o \
+	  checkboxtree.o
+
+ifneq ($(GNU_LD),)
+SHLIBFLAGS= -Wl,--version-script,newt.0.52.ver -Wl,-soname,$(LIBNEWTSONAME)
+else
+SHLIBFLAGS=
+endif
+
+SHCFLAGS = -fPIC
+
+prefix = @prefix@
+includedir = @includedir@
+exec_prefix = @exec_prefix@
+libdir = @libdir@
+bindir = @bindir@
+datadir = @datadir@
+datarootdir = @datarootdir@
+mandir = @mandir@
+man1dir = $(mandir)/man1
+pkgconfigdir = $(libdir)/pkgconfig
+instroot ?= $(DESTDIR)
+
+#--------------------------------------
+
+SOURCES = $(subst .o,.c,$(TESTOBJS) $(NDIALOGOBJS) $(LIBOBJS))
+
+SHAREDDIR = shared
+SHAREDOBJS = $(patsubst %,$(SHAREDDIR)/%, $(LIBOBJS))
+
+ifeq (.depend,$(wildcard .depend))
+TARGET=$(PROGS)
+else
+TARGET=depend $(PROGS)
+endif
+
+all:	$(TARGET) _snack.$(SOEXT)
+
+test:	test.o $(LIBNEWT)
+	$(CC) -g -o test test.o $(LIBNEWT) $(LDFLAGS) $(LIBS)
+
+testgrid:	testgrid.o $(LIBNEWT)
+	$(CC) -g -o testgrid testgrid.o $(LIBNEWT) $(LDFLAGS) $(LIBS)
+
+testtree:	testtree.o $(LIBNEWT)
+	$(CC) -g -o testtree testtree.o $(LIBNEWT) $(LDFLAGS) $(LIBS)
+
+showchars:	showchars.o $(LIBNEWT)
+	$(CC) -g -o showchars showchars.o $(LIBNEWT) $(LDFLAGS) $(LIBS)
+
+showkey:	showkey.o $(LIBNEWT)
+	$(CC) -g -o showkey showkey.o $(LIBNEWT) $(LDFLAGS) $(LIBS)
+
+_snack.$(SOEXT):   snack.c $(LIBNEWTSH)
+	@[ -n "$(PYTHONVERS)" ] && for ver in $(PYTHONVERS); do \
+		pyconfig=$$ver-config; \
+		if ! $$pyconfig --cflags > /dev/null 2>&1 && \
+				python-config --cflags > /dev/null 2>&1; then \
+			echo $$pyconfig not found, using python-config; \
+			pyconfig=python-config; \
+		fi; \
+		mkdir -p $$ver; \
+		PCFLAGS=`$$pyconfig --cflags`; \
+		PIFLAGS=`$$pyconfig --includes`; \
+		PLDFLAGS=`$$pyconfig --ldflags`; \
+		PLFLAGS=`$$pyconfig --libs`; \
+		echo $(CC) $(SHCFLAGS) $(CPPFLAGS) $$PIFLAGS $$PCFLAGS -c -o $$ver/snack.o snack.c; \
+		$(CC) $(SHCFLAGS) $(CPPFLAGS) $$PIFLAGS $$PCFLAGS -c -o $$ver/snack.o snack.c; \
+		echo $(CC) --shared $$PLDFLAGS $$PLFLAGS $(LDFLAGS) -o $$ver/_snack.$(SOEXT) $$ver/snack.o -L.  -lnewt $(LIBS); \
+		$(CC) --shared $$PLDFLAGS $$PLFLAGS $(LDFLAGS) -o $$ver/_snack.$(SOEXT) $$ver/snack.o -L.  -lnewt $(LIBS); \
+	done || :
+	touch $@
+
+whiptail: $(NDIALOGOBJS) $(LIBNEWTSH)
+	$(CC) -g -o whiptail $(NDIALOGOBJS) -L. $(LDFLAGS) -lnewt $(LIBS) -lpopt
+
+whiptcl.$(SOEXT): $(WHIPTCLOBJS) $(LIBNEWTSH)
+	$(CC) -shared $(SHCFLAGS) $(LDFLAGS) -o whiptcl.$(SOEXT) $(WHIPTCLOBJS) -L. -lnewt  $(LIBTCL) -lpopt $(LIBS)
+
+$(LIBNEWT): $(LIBOBJS)
+	ar rv $@ $^
+
+newt.o $(SHAREDDIR)/newt.o: newt.c Makefile
+
+veryclean: clean
+	rm -f .depend *.pc
+
+clean:
+	rm -f $(PROGS) *.o $(LIBNEWT) core $(LIBNEWTSH)  \
+		$(SHAREDDIR)/*.o *.$(SOEXT)*
+
+depend:
+	$(CC) $(CFLAGS) $(CPPFLAGS) -M $(SOURCES) > .depend
+
+sharedlib: $(LIBNEWTSH)
+
+$(LIBNEWTSH): $(SHAREDOBJS)
+	$(CC) -shared -o $(LIBNEWTSH) $(SHLIBFLAGS) $(SHAREDOBJS) $(LDFLAGS) $(LIBS)
+	ln -fs $(LIBNEWTSONAME) libnewt.$(SOEXT)
+	ln -fs $(LIBNEWTSH) $(LIBNEWTSONAME)
+
+$(SHAREDDIR)/%.o : %.c
+	@mkdir -p $(SHAREDDIR)
+	$(CC) $(SHCFLAGS) -c $(CFLAGS) $(CPPFLAGS) -o $@ $<
+
+install: $(LIBNEWT) install-sh whiptail
+	[ -d $(instroot)/$(bindir) ] || install -m 755 -d $(instroot)/$(bindir)
+	[ -d $(instroot)/$(libdir) ] || install -m 755 -d $(instroot)/$(libdir)
+	[ -d $(instroot)/$(includedir) ] || install -m 755 -d $(instroot)/$(includedir)
+	[ -d $(instroot)/$(man1dir) ] || install -m 755 -d $(instroot)/$(man1dir)
+	[ -d $(instroot)/$(pkgconfigdir) ] || install -m 755 -d $(instroot)/$(pkgconfigdir)
+	install -m 644 newt.h $(instroot)/$(includedir)
+	install -m 644 $(LIBNEWT) $(instroot)/$(libdir)
+	install -m 755 whiptail $(instroot)/$(bindir)
+	install -m 644 whiptail.1 $(instroot)/$(man1dir)
+	make -C po datadir=$(instroot)/$(datadir) install
+	install -m 644 libnewt.pc $(instroot)/$(pkgconfigdir)
+
+install-sh: sharedlib $(WHIPTCLSO) _snack.$(SOEXT)
+	[ -d $(instroot)/$(libdir) ] || install -m 755 -d $(instroot)/$(libdir)
+	install -m 755 $(LIBNEWTSH) $(instroot)/$(libdir)
+	ln -sf $(LIBNEWTSONAME) $(instroot)/$(libdir)/libnewt.$(SOEXT)
+	ln -sf $(LIBNEWTSH) $(instroot)/$(libdir)/$(LIBNEWTSONAME)
+	[ -n "$(WHIPTCLSO)" ] && install -m 755 whiptcl.$(SOEXT) $(instroot)/$(libdir) || :
+	[ -n "$(PYTHONVERS)" ] && for ver in $(PYTHONVERS) ; do \
+	   [ -d $(instroot)/$(libdir)/$$ver/site-packages ] || install -m 755 -d $(instroot)/$(libdir)/$$ver/site-packages ;\
+	   install -m 755 $$ver/_snack.$(SOEXT) $(instroot)/$(libdir)/$$ver/site-packages ;\
+	   install -m 644 snack.py $(instroot)/$(libdir)/$$ver/site-packages ;\
+	done || :
+
+Makefile: configure.ac
+	@echo "You need to rerun ./autogen.sh and ./configure before continuing"
+	@exit 1
+
+create-archive: Makefile
+	@rm -rf /tmp/newt-$(VERSION)
+	@git archive --prefix=newt-$(VERSION)/ $(TAG) | tar x -C /tmp
+	@cd /tmp/newt-$(VERSION) && ./autogen.sh && rm -rf autom4te.cache .gitignore
+	@cd /tmp; tar c --owner root --group root newt-$(VERSION) | gzip -9 > newt-$(VERSION).tar.gz
+	@rm -rf /tmp/newt-$(VERSION)
+	@cp /tmp/newt-$(VERSION).tar.gz .
+	@rm -f /tmp/newt-$(VERSION).tar.gz
+	@echo " "
+	@echo "The final archive is ./newt-$(VERSION).tar.gz."
+
+tag-archive: Makefile
+	@git tag $(TAG)
+
+archive: tag-archive create-archive
+
+ifeq (.depend,$(wildcard .depend))
+include .depend
+endif

@@ -1,0 +1,14 @@
+INCLUDES += -I../deps/
+include_rules
+CFLAGS += -DSQLITE_OMIT_LOAD_EXTENSION
+LIBS = -lm -ldl -lpthread
+: ../deps/packcc/packcc | rdsl.cc |> ../deps/packcc/packcc rdsl.cc |> rdsl.h | rdsl.c
+: foreach *.c | rdsl.h |> $(CC) -std=$(CSTD) -fdata-sections -ffunction-sections -c %f -o %o $(CFLAGS) -Wl,--gc-sections -Wno-unused-parameter -Wno-unused-variable $(INCLUDES) |> %B.o
+: *.o \
+  ../deps/core/libcore.a \
+  ../deps/argtable3/libargtable3.a \
+  ../deps/sds/libsds.a \
+  ../deps/sqlite/libsqlite.a \
+  ../deps_tui/newt/libnewt.a \
+  ../deps_tui/slang/src/objs/libslang.a \
+  |> $(CC) -static %f -o %o $(LIBS) |> turbobuilder

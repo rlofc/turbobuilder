@@ -1,0 +1,11 @@
+WARNINGS += -W
+WARNINGS += -Wall
+WARNINGS += -Wno-missing-field-initializers
+ifeq (@(MYPROJ_DEBUG),y)
+CFLAGS = $(WARNINGS) -g -m64 -D_GNU_SOURCE -DHAVE_STDINT_H
+else
+CFLAGS = $(WARNINGS) -O2 -m64 -D_GNU_SOURCE -DHAVE_STDINT_H -DNDEBUG
+endif
+CFLAGS_EXT = -O2 -m64 -D_GNU_SOURCE -DHAVE_STDINT_H
+CSTD = c99
+CC = clang

@@ -1,0 +1,92 @@
+Customer = entity {
+    Name = field { type: text; size: 12; listed: true; }
+    Address = field { type: text; size: 30; }
+    Contact = field { type: text; size: 15; }
+    Phone = field { type: text; size: 12; }
+    Orders = relation { ref: Order.Customerz; }
+    Volume = field { type: auto; size: 9; listed: false; 
+        value: Sum(Orders.Cost);
+    }
+    Value = field { type: auto; size: 9; listed: false; 
+        value: Avg(Orders.Cost);
+    }
+}
+
+Order = entity {
+    OrderId = field { type: text; size: 8; listed: true; }
+    Customerz = field { ref: Customer.Name; size: 12; listed: true; }
+    Date = field { type: text; size: 12; } 
+    Items = relation { ref: OrderItem.Order; }
+    Cost = field { type: auto; size: 9; listed: false; 
+        value: Sum(Items.Cost);
+    }
+}
+
+Item = entity {
+    Name = field { type: text; size: 20; listed: true; }
+    Price = field { type: integer; size: 7; listed: true; }
+    Quantity = field { type: text; size: 5; listed: true; }
+    Stock = field { type: auto; size: 5; listed: false; 
+        value: Sum(Inventory.Stock);
+    }
+    Reserved = field { type: auto; size: 5; listed: false; 
+        value: Sub(Quantity, Sum(Orders.Quantity));
+    }
+    Remaining = field { type: auto; size: 5; listed: false; 
+        value: Sub(Stock, Sum(Orders.Quantity));
+    }
+    Warehouses = field { type: auto; size: 5; listed: false; 
+        value: Count(Inventory.Item);
+    }
+    Orders = relation { ref: OrderItem.Item; }
+    Inventory = relation { ref: WarehouseItem.Item; }
+}
+
+OrderItem = entity {
+    Order = field { ref: Order.OrderId; size: 8; listed: true; }
+    Item = field { ref: Item.Name; size: 20; listed: true; }
+    Quantity = field { type: text; size: 5; listed: true; }
+    Cost = field { type: auto; size: 5; listed: false; 
+        value: Mul(Item.Price, Quantity);
+    }
+    Withdrawls = relation { ref: StockWithdraw.OrderItem; }
+}
+
+Warehouse = entity {
+    Name = field { type: text; size: 20; listed: true; }
+    Address = field { type: text; size: 30; }
+    Contact = field { type: text; size: 15; }
+    Phone = field { type: text; size: 12; }
+    Inventory = relation { ref: WarehouseItem.Warehouse; }
+    Value = field { type: auto; size: 5; listed: false; 
+        value: Sum(Inventory.Value);
+    }
+}
+
+WarehouseItem = entity {
+    Warehouse = field { ref: Warehouse.Name; size: 20; listed: true; }
+    Item = field { ref: Item.Name; size: 20; listed: true; }
+    Stock = field { type: text; size: 5; listed: true; }
+    Value = field { type: auto; size: 10; listed: false; 
+        value: Mul(Item.Price, Stock);
+    }
+    Orders = relation { ref: OrderItem.Stock; }
+    Withdrawls = relation { ref: StockWithdraw.Stock; }
+    Commited = field { type: auto; size: 10; listed: false;
+        value: Sum(Withdrawls.Quantity);
+    }
+    Surplus = field { type: auto; size: 10; listed: false;
+        value: Sub(Stock, Sum(Withdrawls.Quantity));
+    }
+}
+
+StockWithdraw = entity {
+    Quantity = field { type: text; size: 5; listed: true; }
+    OrderItem = field { ref: OrderItem.Item; size: 20; listed: false; }
+    Stock = field { ref: WarehouseItem.Warehouse; filter: OrderItem; size: 20; listed: true; }
+}
+
+English = translation {
+    WarehouseItem = "Stock";
+    OrderItem = "Request";
+}

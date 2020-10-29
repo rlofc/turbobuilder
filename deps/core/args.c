@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "args.h"
-#include "./argtable3.h"
+#include "argtable3/argtable3.h"
 
 static int argindex = 0;
 static void* argtable[1000] = {0};

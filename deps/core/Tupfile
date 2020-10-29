@@ -1,3 +1,4 @@
+INCLUDES += -I../
 include_rules
-: foreach *.c |> $(CC) -std=$(CSTD) -c %f -o %o $(CFLAGS) -I ../../deps/argtable3/|> %B.o
+: foreach *.c |> $(CC) -std=$(CSTD) -c %f -o %o $(CFLAGS) $(INCLUDES) |> %B.o
 : *.o |> ar crs %o %f |> libcore.a

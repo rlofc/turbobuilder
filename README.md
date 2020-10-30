@@ -6,11 +6,17 @@ An experimental 80's inspired data entry and retrieval tool.
 
 ![TURBUBUILDER GIF](/art/merchant.gif)
 
+## Current state
+
+*EXPERIMENTAL* - use with caution. There are many features still missing for
+TURBOBUILDER to be fully usable.
+
 ## Declarative Application Development
 
 TURBOBUILDER is a declarative, model-driven, single-user application generator.
-TURBOBUILDER reads a declarative model from text file to dynamically generate
-a simple data management application.
+TURBOBUILDER generates simple data management applications using a declarative
+entity model. The model is currently read from a text file - but the plan is
+to use TURBOBUILDER itself to define it.
 
 ## But why??!
 

@@ -93,11 +93,11 @@ _TR(const char* term)
 {
     struct translation* t;
     HASH_FIND_STR(g_translations, "English", t);
+    if (t == NULL) return term;
     struct label* wrapper;
     HASH_FIND_STR(t->labels, term, wrapper);
     if (wrapper == NULL) return term;
-    else
-        return wrapper->label;
+    return wrapper->label;
 }
 
 int

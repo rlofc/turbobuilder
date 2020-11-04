@@ -106,8 +106,7 @@ find_relation(const struct relation* rs, const char* name, struct relation** r)
     struct relation* wrapper;
     HASH_FIND_STR(rs, name, wrapper);
     *r = wrapper != NULL ? wrapper : NULL;
-    if (wrapper == NULL) printf("%s\n", "wrapper");
-    return 0;
+    return wrapper == NULL ? -1 : 0;
 }
 
 int
@@ -116,8 +115,7 @@ find_field(const struct field* rs, const char* name, struct field** r)
     struct field* wrapper;
     HASH_FIND_STR(rs, name, wrapper);
     *r = wrapper != NULL ? wrapper : NULL;
-    if (wrapper == NULL) printf("%s\n", "wrapper");
-    return 0;
+    return wrapper == NULL ? -1 : 0;
 }
 
 int
@@ -126,8 +124,7 @@ find_entity(const struct entity* es, const char* name, struct entity** e)
     struct entity* wrapper;
     HASH_FIND_STR(es, name, wrapper);
     *e = wrapper != NULL ? wrapper : NULL;
-    if (wrapper == NULL) printf("%s\n", "wrapper");
-    return 0;
+    return wrapper == NULL ? -1 : 0;
 }
 
 /* -- MEMORY CLEANUP -- */

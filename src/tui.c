@@ -501,7 +501,9 @@ show_entity_form_view(struct entity_value_tui* e,
                 {
                     key = ret = wk.v;
                     newtPopHelpLine();
-                    newtPushHelpLine(key >= 0 ? helpline : "");
+                    sdsfree(helpline);
+                    helpline = add_relations_hotkeys(e->ee->base, form);
+                    newtPushHelpLine(helpline);
                     newtFormSetCurrent(form, close_button);
                     exit = 1;
                 }

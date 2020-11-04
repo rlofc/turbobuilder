@@ -777,7 +777,7 @@ apply_form(struct entity_value* e, sqlite3* db, int key)
         goto cleanup_sqlite;
     }
     if (sqlite3_step(res) == SQLITE_DONE) {
-        if (key == 0) key = sqlite3_last_insert_rowid(db);
+        if (key <=0 ) key = sqlite3_last_insert_rowid(db);
     }
     ret = (wrapped_key){key};
 cleanup_sqlite:

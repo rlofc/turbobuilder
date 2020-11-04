@@ -60,7 +60,7 @@ sds
 get_ref_value(sqlite3* db, int key, const char* ename, const char* efield);
 
 wrapped_sql
-build_list_query(struct entity* e, struct context* ctx, struct fpath* order);
+build_list_query(struct entity* e, struct context* ctx, struct order* order);
 
 sds
 field_value_to_string(struct field* f, sqlite3_stmt* res, int index);

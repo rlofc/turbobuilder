@@ -135,8 +135,8 @@ cleanup_relation(struct relation* r)
     sdsfree(r->name);
     sdsfree(r->fk.eid);
     sdsfree(r->fk.fid);
-    sdsfree(r->order.eid);
-    sdsfree(r->order.fid);
+    sdsfree(r->order.fpath.eid);
+    sdsfree(r->order.fpath.fid);
 }
 
 void
@@ -168,8 +168,8 @@ cleanup_field(struct field* f)
     if (f->type == REF) {
         sdsfree(f->ref.eid);
         sdsfree(f->ref.fid);
-        sdsfree(f->order.eid);
-        sdsfree(f->order.fid);
+        sdsfree(f->order.fpath.eid);
+        sdsfree(f->order.fpath.fid);
     }
     sdsfree(f->format);
     if (f->type == REAL) {

@@ -4,7 +4,7 @@ App = application {
 
 Trainee = entity {
     Name = field { type: text; size: 16; listed: true; }
-    Sessions = relation { ref: Session.Trainee; sortby: Session.Date; }
+    Sessions = relation { ref: Session.Trainee; orderdesc: Session.Date; }
     Exercises = relation { ref: Exercise.Trainee; }
 }
 
@@ -12,13 +12,13 @@ Session = entity {
     Trainee = field { ref: Trainee.Name; size: 16; listed: true; }
     Date = field { type: date; size: 12; listed: true; }
     Description = field { type: text; size: 30; listed: true; }
-    Exercises = relation { ref: SessionExercise.Session; }
+    Exercises = relation { ref: SessionExercise.Session; orderasc: SessionExercise.Index;}
 }
 
 Exercise = entity {
     Trainee = field { ref: Trainee.Name; size: 16; listed: true; }
     Name = field { type: text; size: 12; listed: true; }
-    Sessions = relation { ref: SessionExercise.Exercise; sortby: Session.Date; }
+    Sessions = relation { ref: SessionExercise.Exercise; orderdesc: Session.Date; }
     OneRepMax = field { type: real; size: 6; format: "%.2f"; listed: true; }
     AverageIntensity = field { type: auto; size: 10; listed: false;
         value: RollingDaysAvg(Sessions.RelativeIntensity, Sessions.Date, 20);
@@ -27,7 +27,7 @@ Exercise = entity {
 
 Variation = entity {
     Name = field { type: text; size: 30; listed: true; }
-    Sessions = relation { ref: SessionExercise.Variation; sortby: Session.Date; }
+    Sessions = relation { ref: SessionExercise.Variation; orderdesc: Session.Date; }
     Occurances = field { type: auto; size: 10; listed: false; 
         value: Count(Sessions.Sets);
     }
@@ -35,6 +35,7 @@ Variation = entity {
 
 SessionExercise = entity {
     Session = field { ref: Session.Date; size: 12; listed: true; }
+    Index = field { type: text; size: 4; listed: true; }
     Exercise = field { ref: Exercise.Name; size: 12; listed: true; }
     Variation = field { ref: Variation.Name; size: 30; listed: true;}
     Sets = field { type: integer; size: 3; listed: true; }
@@ -43,8 +44,23 @@ SessionExercise = entity {
     RelativeIntensity = field { type: auto; size: 10; listed: false;
         value: Div(Weight, Exercise.OneRepMax);
     }
+    SetsLog = relation { ref: SessionExerciseSetLog.Exercise;}
+}
+
+SessionExerciseSetLog = entity {
+    Exercise = field { ref: SessionExercise.Exercise; size: 12; listed: true; }
+    Type = field { ref: SetLogType.Name; size: 10; listed: true; }
+    Reps = field { type: integer; size: 3; listed: true; }
+    Weight = field { type: real; size: 6; format: "%.2f"; listed: true; }
+    Notes = field { type: text; size: 10; listed: true; }
+}
+
+SetLogType = entity {
+    Name = field { type:text; size: 10; listed: true; }
+    LogEntries = relation { ref: SessionExerciseSetLog.Type;}
 }
 
 English = translation {
     SessionExercise = "Session Exercise";
+    SessionExerciseSetLog = "Training Log";
 }

@@ -147,10 +147,17 @@ relation_defs <- _ '}' {
         parser->r->fk.eid = sdsnew(c);
         parser->r->fk.fid = sdsnew(a);
     }
-    / _ 'sortby' _ ':' _ c:identifier '.' a:identifier _ ';' relation_defs { 
+    / _ 'orderdesc' _ ':' _ c:identifier '.' a:identifier _ ';' relation_defs { 
         struct t_parser * parser = auxil;
-        parser->r->order.eid = sdsnew(c);
-        parser->r->order.fid = sdsnew(a);
+        parser->r->order.fpath.eid = sdsnew(c);
+        parser->r->order.fpath.fid = sdsnew(a);
+        parser->r->order.asc = false;
+    }
+    / _ 'orderasc' _ ':' _ c:identifier '.' a:identifier _ ';' relation_defs { 
+        struct t_parser * parser = auxil;
+        parser->r->order.fpath.eid = sdsnew(c);
+        parser->r->order.fpath.fid = sdsnew(a);
+        parser->r->order.asc = true;
     }
 
 
@@ -200,8 +207,8 @@ field_defs <- _ '}' {
     }
     / _ 'sortby' _ ':' _ c:identifier '.' a:identifier _ ';' field_defs { 
         struct t_parser * parser = auxil;
-        parser->f->order.eid = sdsnew(c);
-        parser->f->order.fid = sdsnew(a);
+        parser->f->order.fpath.eid = sdsnew(c);
+        parser->f->order.fpath.fid = sdsnew(a);
     }
     / _ 'value' _ ':' _ v:formula _ ';' field_defs { 
         struct t_parser * parser = auxil;

@@ -150,10 +150,11 @@ destroy_entity_value(struct entity_value_tui* eetui)
 }
 
 int
-show_lookup_form(struct entity*  e,
+show_lookup_form(const char* title,
+                 struct entity*  e,
                  sqlite3*        db,
                  struct context* ctx,
-                 struct fpath*   order,
+                 struct order*   order,
                  bool            lookup_only);
 
 lookup_data ld;
@@ -592,7 +593,7 @@ query_in_listbox(struct entity*  e,
                  newtComponent   entities_listbox,
                  const char*     search_term,
                  struct context* ctx,
-                 struct fpath*   order)
+                 struct order*   order)
 {
     $status       status       = $okay;
     sds           search_query = sdsempty();

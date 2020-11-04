@@ -483,7 +483,7 @@ error:
 }
 
 wrapped_sql
-build_list_query(struct entity* e, struct context* ctx, struct fpath* order)
+build_list_query(struct entity* e, struct context* ctx, struct order* order)
 {
     wrapped_sql ret;
     const char* template = "SELECT %s from [%ss] %s WHERE (%s)";
@@ -501,9 +501,9 @@ build_list_query(struct entity* e, struct context* ctx, struct fpath* order)
                  sql, " AND [%ss].[%s] = %d", e->name, ctx->fname, ctx->k));
     }
     if (order != NULL) {
-        if (order->fid)
+        if (order->fpath.fid)
             $check(sql = sdscatprintf(
-                     sql, " ORDER BY [%ss].[%s] DESC", order->eid, order->fid));
+                     sql, " ORDER BY [%ss].[%s] %s", order->fpath.eid, order->fpath.fid, order->asc ? "ASC" : "DESC"));
     }
     ret = (wrapped_sql){ sql };
     goto cleanup;

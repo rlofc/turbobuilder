@@ -48,6 +48,12 @@ struct fpath
     char* fid;
 };
 
+struct order
+{
+    struct fpath fpath;
+    bool asc;
+};
+
 struct arg;
 
 #define MAX_ARGS 10
@@ -85,7 +91,7 @@ struct field
     ftype        type;
     int          length;
     struct fpath ref;
-    struct fpath order;
+    struct order order;
     char*        format;
     bool         listed;
     struct func* autofunc;
@@ -96,7 +102,7 @@ struct relation
 {
     char*          name;
     struct fpath   fk;
-    struct fpath   order;
+    struct order   order;
     UT_hash_handle hh;
 };
 

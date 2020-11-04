@@ -211,14 +211,6 @@ field_defs <- _ '}' {
         free(item->arg);
         free(item);
     }
-    / _ 'condition' _ ':' _ v:condition _ ';' field_defs { 
-        struct t_parser * parser = auxil;
-        args_stack_element * item;
-        STACK_POP(parser->head, item);
-        parser->f->autocond = item->arg->atfunc;
-        free(item->arg);
-        free(item);
-    }
     / _ 'format' _ ':' _ '"' v:tidentifier '"' _ ';' field_defs { 
         struct t_parser * parser = auxil;
         parser->f->format = sdsnew(v);
@@ -257,6 +249,7 @@ formula <-  fname:identifier _ '(' _ formula_args _ ')' _ {
         if (strcmp(fname, "Min") == 0) nargs = 1;
         if (strcmp(fname, "Max") == 0) nargs = 1;
         if (strcmp(fname, "Avg") == 0) nargs = 1;
+        if (strcmp(fname, "RollingDaysAvg") == 0) nargs = 3;
         if (strcmp(fname, "Count") == 0) nargs = 1;
         if (strcmp(fname, "Sub") == 0) nargs = 2;
         if (strcmp(fname, "Mul") == 0) nargs = 2;
@@ -264,27 +257,7 @@ formula <-  fname:identifier _ '(' _ formula_args _ ')' _ {
         struct func * f = calloc(1, sizeof(struct func));
         f->name = sdsnew(fname);
         f->n_args = nargs;
-        for (int i = 0; i < nargs; i++) {
-            args_stack_element * item;
-            STACK_POP(parser->head, item);
-            f->args[i] = item->arg;
-            free(item);
-        }
-        args_stack_element * item = calloc(1, sizeof(args_stack_element));
-        item->arg = calloc(1, sizeof(struct arg));
-        item->arg->type = ATFUNC;
-        item->arg->atfunc = f;
-        STACK_PUSH(parser->head, item);
-    }
-
-condition <-  fname:identifier _ '(' _ formula_args _ ')' _ { 
-        struct t_parser * parser = auxil;
-        int nargs = 0;
-        if (strcmp(fname, "NotBeforeDays") == 0) nargs = 2;
-        struct func * f = calloc(1, sizeof(struct func));
-        f->name = sdsnew(fname);
-        f->n_args = nargs;
-        for (int i = 0; i < nargs; i++) {
+        for (int i = nargs-1; i >=0 ; --i) {
             args_stack_element * item;
             STACK_POP(parser->head, item);
             f->args[i] = item->arg;

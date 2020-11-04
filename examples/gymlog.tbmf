@@ -21,8 +21,7 @@ Exercise = entity {
     Sessions = relation { ref: SessionExercise.Exercise; sortby: Session.Date; }
     OneRepMax = field { type: real; size: 6; format: "%.2f"; listed: true; }
     AverageIntensity = field { type: auto; size: 10; listed: false;
-        value: Avg(Sessions.RelativeIntensity);
-        condition: NotBeforeDays(sessions.Timestamp, 20);
+        value: RollingDaysAvg(Sessions.RelativeIntensity, Sessions.Date, 20);
     }
 }
 

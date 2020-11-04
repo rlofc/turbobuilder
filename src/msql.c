@@ -145,7 +145,7 @@ augment_entity_query_agg(struct entity*   p,
                          struct func*     f,
                          const char*      agg)
 {
-    const char* template = "(SELECT %s(%s) %s FROM %s %s %s %s) %s";
+    const char* template = "(SELECT %s(%s) %s FROM %s %s %s %s %s) %s";
 
     sds select = sdsempty();
     sds from   = sdsempty();
@@ -196,6 +196,7 @@ augment_entity_query_agg(struct entity*   p,
                                            "",
                                            "",
                                            gb,
+                                           "%s",
                                            uuid));
             } else {
                 a.v.from = sdscatprintf(a.v.from, "%s", fr);
@@ -208,6 +209,7 @@ augment_entity_query_agg(struct entity*   p,
                                            join.v,
                                            where,
                                            gb,
+                                           "%s",
                                            uuid));
             }
 
@@ -219,7 +221,7 @@ augment_entity_query_agg(struct entity*   p,
             $check(sum = sdscatprintf(
                      sum, "[%ss].%s", r->fk.eid, f->args[0]->atfield));
             $check(from = sdscatprintf(
-                     from, template, agg, sum, uuid, fr, "", where, "", uuid));
+                     from, template, agg, sum, uuid, fr, "", where, "", "%s", uuid));
             sdsfree(sum);
         }
         sdsfree(fr);
@@ -230,6 +232,50 @@ augment_entity_query_agg(struct entity*   p,
     return (wrapped_qe){ (struct query_extensions){ select, from } };
 error:
     return $invalid(wrapped_qe);
+}
+
+wrapped_qe
+augment_entity_query_nocond_agg(struct entity*   p,
+                         struct relation* pr,
+                         struct entity*   e,
+                         struct field*    ff,
+                         struct func*     f,
+                         const char*      agg)
+{
+    wrapped_qe qe= augment_entity_query_agg(p, pr, e, ff, f, agg);
+    $inspect(qe);
+    sds updated_from = sdscatprintf(sdsempty(), qe.v.from, "");
+    sdsfree(qe.v.from);
+    qe.v.from = updated_from;
+error:
+    return qe;
+}
+
+wrapped_qe
+augment_entity_query_date_cond_agg(struct entity*   p,
+                         struct relation* pr,
+                         struct entity*   e,
+                         struct field*    ff,
+                         struct func*     f,
+                         const char*      agg,
+                         const char*      op,
+                         const char*      tdelta_template)
+{
+    wrapped_qe qe= augment_entity_query_agg(p, pr, e, ff, f, agg);
+    $inspect(qe);
+    const char * template = " AND DATE([%s].%s,'unixepoch')%sDATE('now','%s')";
+    sds tdelta = sdscatprintf(sdsempty(), tdelta_template, f->args[2]->atfield);
+    sds where_addition = sdscatprintf(sdsempty(),
+                                      template,
+                                      f->args[1]->atentity,
+                                      f->args[1]->atfield,
+                                      op,
+                                      tdelta);
+    sds updated_from = sdscatprintf(sdsempty(), qe.v.from, where_addition);
+    sdsfree(qe.v.from);
+    qe.v.from = updated_from;
+error:
+    return qe;
 }
 
 wrapped_qe
@@ -285,8 +331,8 @@ augment_entity_query_op(struct entity*   p,
     const char* template = "(%s %s %s)";
 
     wrapped_qe arg1, arg0;
-    arg1 = augment_entity_query_op_arg(f->args[1], p, pr, e, ff);
-    arg0 = augment_entity_query_op_arg(f->args[0], p, pr, e, ff);
+    arg1 = augment_entity_query_op_arg(f->args[0], p, pr, e, ff);
+    arg0 = augment_entity_query_op_arg(f->args[1], p, pr, e, ff);
     $inspect(arg0, error);
     $inspect(arg1, error);
 
@@ -319,15 +365,18 @@ augment_entity_query_inner(struct entity*   p,
     if (strcmp(f->name, "Div") == 0)
         return augment_entity_query_op(p, pr, e, ff, f, "/");
     if (strcmp(f->name, "Sum") == 0)
-        return augment_entity_query_agg(p, pr, e, ff, f, "SUM");
+        return augment_entity_query_nocond_agg(p, pr, e, ff, f, "SUM");
     if (strcmp(f->name, "Min") == 0)
-        return augment_entity_query_agg(p, pr, e, ff, f, "MIN");
+        return augment_entity_query_nocond_agg(p, pr, e, ff, f, "MIN");
     if (strcmp(f->name, "Max") == 0)
-        return augment_entity_query_agg(p, pr, e, ff, f, "MAX");
+        return augment_entity_query_nocond_agg(p, pr, e, ff, f, "MAX");
     if (strcmp(f->name, "Avg") == 0)
-        return augment_entity_query_agg(p, pr, e, ff, f, "AVG");
+        return augment_entity_query_nocond_agg(p, pr, e, ff, f, "AVG");
+    if (strcmp(f->name, "RollingDaysAvg") == 0)
+        return augment_entity_query_date_cond_agg(p, pr, e, ff, f, "AVG", ">=",
+                                                  "-%s days");
     if (strcmp(f->name, "Count") == 0)
-        return augment_entity_query_agg(p, pr, e, ff, f, "COUNT");
+        return augment_entity_query_nocond_agg(p, pr, e, ff, f, "COUNT");
 
     $log_error("unknown auto field function %s", f->name);
     return $invalid(wrapped_qe);

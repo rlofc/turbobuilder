@@ -125,8 +125,8 @@ build_entity_query_joins(struct entity* e)
                                   next_field->ref.eid,
                                   next_entity->name,
                                   next_field->name));
-            find_entity(g_entities, next_field->ref.eid, &next_entity);
-            find_field(next_entity->fields, next_field->ref.fid, &next_field);
+            $check(find_entity(g_entities, next_field->ref.eid, &next_entity)==0);
+            $check(find_field(next_entity->fields, next_field->ref.fid, &next_field)==0);
         }
     }
     return (wrapped_sql){ join };
@@ -156,9 +156,9 @@ augment_entity_query_agg(struct entity*   p,
         struct relation* r;
         struct entity*   r_entity;
         struct field*    r_field;
-        find_relation(e->relations, f->args[0]->atentity, &r);
-        find_entity(g_entities, r->fk.eid, &r_entity);
-        find_field(r_entity->fields, f->args[0]->atfield, &r_field);
+        $check(find_relation(e->relations, f->args[0]->atentity, &r)==0);
+        $check(find_entity(g_entities, r->fk.eid, &r_entity)==0);
+        $check(find_field(r_entity->fields, f->args[0]->atfield, &r_field)==0);
         sds where = sdsempty();
         sds gb    = sdsempty();
         if (p == NULL) {
@@ -294,7 +294,7 @@ augment_entity_query_op_arg(struct arg*      arg,
     }
     if (arg->type == ATFIELD) {
         struct field* of;
-        find_field(e->fields, arg->atfield, &of);
+        $check(find_field(e->fields, arg->atfield, &of)==0);
         if (of->type == AUTO) {
             $check(select = sdscatprintf(select,
                                          "uuid%s%s.uuid%s%s",
@@ -418,9 +418,9 @@ build_entity_query_columns(struct entity* e, bool include_refid)
             while (next_field->type == REF) {
                 cur_entity = next_entity;
                 cur_field  = next_field;
-                find_entity(g_entities, next_field->ref.eid, &next_entity);
-                find_field(
-                  next_entity->fields, next_field->ref.fid, &next_field);
+                $check(find_entity(g_entities, next_field->ref.eid, &next_entity)==0);
+                $check(find_field(
+                  next_entity->fields, next_field->ref.fid, &next_field)==0);
             }
             if (include_refid) {
                 $check(columns = sdscatprintf(columns,
@@ -489,9 +489,10 @@ build_list_query(struct entity* e, struct context* ctx, struct fpath* order)
     const char* template = "SELECT %s from [%ss] %s WHERE (%s)";
     sds         sql      = sdsempty();
     wrapped_sql columns  = build_entity_query_columns(e, false);
-    $inspect(columns, error) wrapped_sql join = build_entity_query_joins(e);
-    $inspect(join, error);
+    wrapped_sql join = build_entity_query_joins(e);
     wrapped_sql filters = build_list_filters(e);
+    $inspect(columns, error);
+    $inspect(join, error);
     $inspect(filters, error);
     $check(
       sql = sdscatprintf(sql, template, columns.v, e->name, join.v, filters.v));
@@ -507,8 +508,8 @@ build_list_query(struct entity* e, struct context* ctx, struct fpath* order)
     ret = (wrapped_sql){ sql };
     goto cleanup;
 error:
+    sdsfree(sql);
     ret = $invalid(wrapped_sql);
-    $log_error("test");
 cleanup:
     sdsfree(columns.v);
     sdsfree(join.v);
@@ -597,8 +598,8 @@ get_ref_value(sqlite3* db, int key, const char* ename, const char* efield)
 
     struct entity* ref_entity;
     struct field*  ref_field;
-    find_entity(g_entities, ename, &ref_entity);
-    find_field(ref_entity->fields, efield, &ref_field);
+    $check(find_entity(g_entities, ename, &ref_entity)==0);
+    $check(find_field(ref_entity->fields, efield, &ref_field)==0);
     while (ref_field->type == REF) {
         $check(join = sdscatprintf(join,
                                    " INNER JOIN [%ss] ON [%ss].Id = [%ss].[%s]",
@@ -606,8 +607,8 @@ get_ref_value(sqlite3* db, int key, const char* ename, const char* efield)
                                    ref_field->ref.eid,
                                    ref_entity->name,
                                    ref_field->name));
-        find_entity(g_entities, ref_field->ref.eid, &ref_entity);
-        find_field(ref_entity->fields, ref_field->ref.fid, &ref_field);
+        $check(find_entity(g_entities, ref_field->ref.eid, &ref_entity)==0);
+        $check(find_field(ref_entity->fields, ref_field->ref.fid, &ref_field)==0);
     }
 
     sql = sdscatprintf(sql,

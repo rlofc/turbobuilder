@@ -150,7 +150,7 @@ destroy_entity_value(struct entity_value_tui* eetui)
 }
 
 int
-show_lookup_form(const char* title,
+show_lookup_form(const char*     title,
                  struct entity*  e,
                  sqlite3*        db,
                  struct context* ctx,
@@ -168,7 +168,8 @@ ref_field_filter(newtComponent entry, void* data, int ch, int cursor)
     }
     struct entity* e     = f->_data;
     sds            title = sdscatprintf(sdsempty(), "%s Lookup", _TR(e->name));
-    int key = show_lookup_form(title,f->_data, ld.db, NULL, &f->base->order, true);
+    int            key =
+      show_lookup_form(title, f->_data, ld.db, NULL, &f->base->order, true);
     if (key == -2) return 0;
     f->_kvalue = key;
     sds v      = get_ref_value(ld.db, key, f->base->ref.eid, f->base->ref.fid);
@@ -272,13 +273,13 @@ struct window_size
 get_ideal_list_window_size(struct entity* e)
 {
     int          wcols, wrows;
-    unsigned int width = 1;
+    unsigned int width  = 1;
     unsigned int height = 1;
-    unsigned int maxlw = 0;
+    unsigned int maxlw  = 0;
 
     newtGetScreenSize(&wcols, &wrows);
     unsigned int max_width = wcols * 0.8;
-    height = wrows * 0.7;
+    height                 = wrows * 0.7;
 
     $foreach_hashed(struct field*, f, e->fields)
     {
@@ -290,7 +291,7 @@ get_ideal_list_window_size(struct entity* e)
     if (width < 60) width = 60;
     if (width > max_width) width = max_width;
 
-    return (struct window_size){width, height};
+    return (struct window_size){ width, height };
 }
 
 struct window_size
@@ -449,7 +450,7 @@ show_relation_list_view(newtComponent    parent,
 
     find_entity(g_entities, r->fk.eid, &re);
     newtComponentGetPosition(parent, &px, &py);
-    title = sdscatprintf(title, "%s %ss", _TR(e->name), _TR(r->fk.eid));
+    title     = sdscatprintf(title, "%s %ss", _TR(e->name), _TR(r->fk.eid));
     ctx.fname = r->fk.fid;
     ctx.k     = key;
     show_lookup_form(title, re, db, &ctx, &r->order, false);
@@ -652,7 +653,7 @@ lookup_form_setup(newt_lookup_form* f, int cols, int rows)
 }
 
 int
-show_lookup_form(const char* title,
+show_lookup_form(const char*     title,
                  struct entity*  e,
                  sqlite3*        db,
                  struct context* ctx,
@@ -669,7 +670,7 @@ show_lookup_form(const char* title,
     while (exit != 1) {
         newtListboxClear(f.entities_listbox);
         if ($iserror(query_in_listbox(
-          e, db, f.entities_listbox, f.search_term_buffer, ctx, order))) {
+              e, db, f.entities_listbox, f.search_term_buffer, ctx, order))) {
             break;
         }
         if (resel != -1)
@@ -752,7 +753,8 @@ show_entities_form(sqlite3* db)
         newtFormRun(form, &ee);
         if (ee.reason == NEWT_EXIT_COMPONENT) {
             struct entity* sel = newtListboxGetCurrent(entities_listbox);
-            int r = show_lookup_form(_TR(sel->name),sel, db, NULL, NULL, false);
+            int            r =
+              show_lookup_form(_TR(sel->name), sel, db, NULL, NULL, false);
         }
         if (ee.reason == NEWT_EXIT_HOTKEY) {
             if (ee.u.key == NEWT_KEY_F1) {

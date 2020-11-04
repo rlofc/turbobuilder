@@ -125,8 +125,11 @@ build_entity_query_joins(struct entity* e)
                                   next_field->ref.eid,
                                   next_entity->name,
                                   next_field->name));
-            $check(find_entity(g_entities, next_field->ref.eid, &next_entity)==0);
-            $check(find_field(next_entity->fields, next_field->ref.fid, &next_field)==0);
+            $check(find_entity(g_entities, next_field->ref.eid, &next_entity) ==
+                   0);
+            $check(find_field(next_entity->fields,
+                              next_field->ref.fid,
+                              &next_field) == 0);
         }
     }
     return (wrapped_sql){ join };
@@ -156,9 +159,10 @@ augment_entity_query_agg(struct entity*   p,
         struct relation* r;
         struct entity*   r_entity;
         struct field*    r_field;
-        $check(find_relation(e->relations, f->args[0]->atentity, &r)==0);
-        $check(find_entity(g_entities, r->fk.eid, &r_entity)==0);
-        $check(find_field(r_entity->fields, f->args[0]->atfield, &r_field)==0);
+        $check(find_relation(e->relations, f->args[0]->atentity, &r) == 0);
+        $check(find_entity(g_entities, r->fk.eid, &r_entity) == 0);
+        $check(find_field(r_entity->fields, f->args[0]->atfield, &r_field) ==
+               0);
         sds where = sdsempty();
         sds gb    = sdsempty();
         if (p == NULL) {
@@ -220,8 +224,9 @@ augment_entity_query_agg(struct entity*   p,
             sds sum = sdsempty();
             $check(sum = sdscatprintf(
                      sum, "[%ss].%s", r->fk.eid, f->args[0]->atfield));
-            $check(from = sdscatprintf(
-                     from, template, agg, sum, uuid, fr, "", where, "", "%s", uuid));
+            $check(
+              from = sdscatprintf(
+                from, template, agg, sum, uuid, fr, "", where, "", "%s", uuid));
             sdsfree(sum);
         }
         sdsfree(fr);
@@ -236,13 +241,13 @@ error:
 
 wrapped_qe
 augment_entity_query_nocond_agg(struct entity*   p,
-                         struct relation* pr,
-                         struct entity*   e,
-                         struct field*    ff,
-                         struct func*     f,
-                         const char*      agg)
+                                struct relation* pr,
+                                struct entity*   e,
+                                struct field*    ff,
+                                struct func*     f,
+                                const char*      agg)
 {
-    wrapped_qe qe= augment_entity_query_agg(p, pr, e, ff, f, agg);
+    wrapped_qe qe = augment_entity_query_agg(p, pr, e, ff, f, agg);
     $inspect(qe);
     sds updated_from = sdscatprintf(sdsempty(), qe.v.from, "");
     sdsfree(qe.v.from);
@@ -253,17 +258,17 @@ error:
 
 wrapped_qe
 augment_entity_query_date_cond_agg(struct entity*   p,
-                         struct relation* pr,
-                         struct entity*   e,
-                         struct field*    ff,
-                         struct func*     f,
-                         const char*      agg,
-                         const char*      op,
-                         const char*      tdelta_template)
+                                   struct relation* pr,
+                                   struct entity*   e,
+                                   struct field*    ff,
+                                   struct func*     f,
+                                   const char*      agg,
+                                   const char*      op,
+                                   const char*      tdelta_template)
 {
-    wrapped_qe qe= augment_entity_query_agg(p, pr, e, ff, f, agg);
+    wrapped_qe qe = augment_entity_query_agg(p, pr, e, ff, f, agg);
     $inspect(qe);
-    const char * template = " AND DATE([%s].%s,'unixepoch')%sDATE('now','%s')";
+    const char* template = " AND DATE([%s].%s,'unixepoch')%sDATE('now','%s')";
     sds tdelta = sdscatprintf(sdsempty(), tdelta_template, f->args[2]->atfield);
     sds where_addition = sdscatprintf(sdsempty(),
                                       template,
@@ -271,7 +276,7 @@ augment_entity_query_date_cond_agg(struct entity*   p,
                                       f->args[1]->atfield,
                                       op,
                                       tdelta);
-    sds updated_from = sdscatprintf(sdsempty(), qe.v.from, where_addition);
+    sds updated_from   = sdscatprintf(sdsempty(), qe.v.from, where_addition);
     sdsfree(qe.v.from);
     qe.v.from = updated_from;
 error:
@@ -294,7 +299,7 @@ augment_entity_query_op_arg(struct arg*      arg,
     }
     if (arg->type == ATFIELD) {
         struct field* of;
-        $check(find_field(e->fields, arg->atfield, &of)==0);
+        $check(find_field(e->fields, arg->atfield, &of) == 0);
         if (of->type == AUTO) {
             $check(select = sdscatprintf(select,
                                          "uuid%s%s.uuid%s%s",
@@ -373,8 +378,8 @@ augment_entity_query_inner(struct entity*   p,
     if (strcmp(f->name, "Avg") == 0)
         return augment_entity_query_nocond_agg(p, pr, e, ff, f, "AVG");
     if (strcmp(f->name, "RollingDaysAvg") == 0)
-        return augment_entity_query_date_cond_agg(p, pr, e, ff, f, "AVG", ">=",
-                                                  "-%s days");
+        return augment_entity_query_date_cond_agg(
+          p, pr, e, ff, f, "AVG", ">=", "-%s days");
     if (strcmp(f->name, "Count") == 0)
         return augment_entity_query_nocond_agg(p, pr, e, ff, f, "COUNT");
 
@@ -418,9 +423,11 @@ build_entity_query_columns(struct entity* e, bool include_refid)
             while (next_field->type == REF) {
                 cur_entity = next_entity;
                 cur_field  = next_field;
-                $check(find_entity(g_entities, next_field->ref.eid, &next_entity)==0);
-                $check(find_field(
-                  next_entity->fields, next_field->ref.fid, &next_field)==0);
+                $check(find_entity(
+                         g_entities, next_field->ref.eid, &next_entity) == 0);
+                $check(find_field(next_entity->fields,
+                                  next_field->ref.fid,
+                                  &next_field) == 0);
             }
             if (include_refid) {
                 $check(columns = sdscatprintf(columns,
@@ -489,8 +496,8 @@ build_list_query(struct entity* e, struct context* ctx, struct order* order)
     const char* template = "SELECT %s from [%ss] %s WHERE (%s)";
     sds         sql      = sdsempty();
     wrapped_sql columns  = build_entity_query_columns(e, false);
-    wrapped_sql join = build_entity_query_joins(e);
-    wrapped_sql filters = build_list_filters(e);
+    wrapped_sql join     = build_entity_query_joins(e);
+    wrapped_sql filters  = build_list_filters(e);
     $inspect(columns, error);
     $inspect(join, error);
     $inspect(filters, error);
@@ -502,8 +509,11 @@ build_list_query(struct entity* e, struct context* ctx, struct order* order)
     }
     if (order != NULL) {
         if (order->fpath.fid)
-            $check(sql = sdscatprintf(
-                     sql, " ORDER BY [%ss].[%s] %s", order->fpath.eid, order->fpath.fid, order->asc ? "ASC" : "DESC"));
+            $check(sql = sdscatprintf(sql,
+                                      " ORDER BY [%ss].[%s] %s",
+                                      order->fpath.eid,
+                                      order->fpath.fid,
+                                      order->asc ? "ASC" : "DESC"));
     }
     ret = (wrapped_sql){ sql };
     goto cleanup;
@@ -557,16 +567,14 @@ field_value_to_string(struct field* f, sqlite3_stmt* res, int index)
     sds    ret = sdsempty();
     time_t s;
     switch (f->type) {
-        case REF:
-            {
-                struct entity* ref_entity;
-                $check(find_entity(g_entities, f->ref.eid, &ref_entity)==0);
-                struct field* ref_field;
-                $check(find_field(ref_entity->fields, f->ref.fid, &ref_field)==0);
-                sdsfree(ret);
-                ret = field_value_to_string(ref_field, res, index);
-            }
-            break;
+        case REF: {
+            struct entity* ref_entity;
+            $check(find_entity(g_entities, f->ref.eid, &ref_entity) == 0);
+            struct field* ref_field;
+            $check(find_field(ref_entity->fields, f->ref.fid, &ref_field) == 0);
+            sdsfree(ret);
+            ret = field_value_to_string(ref_field, res, index);
+        } break;
         case TEXT:
             ret = sdscatprintf(ret, "%s", sqlite3_column_text(res, index));
             break;
@@ -595,6 +603,7 @@ field_value_to_string(struct field* f, sqlite3_stmt* res, int index)
         default:
             break;
     }
+error:
     return ret;
 }
 
@@ -607,8 +616,8 @@ get_ref_value(sqlite3* db, int key, const char* ename, const char* efield)
 
     struct entity* ref_entity;
     struct field*  ref_field;
-    $check(find_entity(g_entities, ename, &ref_entity)==0);
-    $check(find_field(ref_entity->fields, efield, &ref_field)==0);
+    $check(find_entity(g_entities, ename, &ref_entity) == 0);
+    $check(find_field(ref_entity->fields, efield, &ref_field) == 0);
     while (ref_field->type == REF) {
         $check(join = sdscatprintf(join,
                                    " INNER JOIN [%ss] ON [%ss].Id = [%ss].[%s]",
@@ -616,8 +625,9 @@ get_ref_value(sqlite3* db, int key, const char* ename, const char* efield)
                                    ref_field->ref.eid,
                                    ref_entity->name,
                                    ref_field->name));
-        $check(find_entity(g_entities, ref_field->ref.eid, &ref_entity)==0);
-        $check(find_field(ref_entity->fields, ref_field->ref.fid, &ref_field)==0);
+        $check(find_entity(g_entities, ref_field->ref.eid, &ref_entity) == 0);
+        $check(find_field(ref_entity->fields, ref_field->ref.fid, &ref_field) ==
+               0);
     }
 
     sql = sdscatprintf(sql,
@@ -690,23 +700,23 @@ parse_date_field(const char* str)
     ti.tm_year -= 1900;
     ti.tm_mon -= 1;
     ti.tm_isdst = -1;
-    return (wrapped_time_t){mktime(&ti)};
+    return (wrapped_time_t){ mktime(&ti) };
 }
 
 $status
 bind_sql_params(struct entity_value* e, sqlite3_stmt* res, int key)
 {
-    $status ret = $okay;
-    sds fname = sdsempty();
+    $status ret   = $okay;
+    sds     fname = sdsempty();
     $foreach_hashed(struct field_value*, f, e->fields)
     {
-        fname = sdscatprintf(fname, "@%s", f->base->name);
-        int idx   = sqlite3_bind_parameter_index(res, fname);
+        fname   = sdscatprintf(fname, "@%s", f->base->name);
+        int idx = sqlite3_bind_parameter_index(res, fname);
         if (f->base->type == REF) {
             sqlite3_bind_int(res, idx, f->_kvalue);
         } else if (f->base->type == DATE) {
             wrapped_time_t wt = parse_date_field((const char*)f->_ret_value);
-            time_t t = $unwrap(wt, ret, cleanup);
+            time_t         t  = $unwrap(wt, ret, cleanup);
             sqlite3_bind_int(res, idx, t);
         } else {
             sqlite3_bind_text(res,
@@ -770,7 +780,7 @@ wrapped_key
 apply_form(struct entity_value* e, sqlite3* db, int key)
 {
     wrapped_key ret;
-    sds sql2;
+    sds         sql2;
     if (key >= 0) {
         sql2 = create_update_statement(e->base);
     } else {
@@ -781,14 +791,15 @@ apply_form(struct entity_value* e, sqlite3* db, int key)
            ret.status,
            sqlite3_errmsg(db),
            cleanup_sql);
-    $onerror2(bind_sql_params(e, res, key)) {
+    $onerror2(bind_sql_params(e, res, key))
+    {
         ret = $invalid(wrapped_key);
         goto cleanup_sqlite;
     }
     if (sqlite3_step(res) == SQLITE_DONE) {
-        if (key <=0 ) key = sqlite3_last_insert_rowid(db);
+        if (key <= 0) key = sqlite3_last_insert_rowid(db);
     }
-    ret = (wrapped_key){key};
+    ret = (wrapped_key){ key };
 cleanup_sqlite:
     sqlite3_finalize(res);
 cleanup_sql:

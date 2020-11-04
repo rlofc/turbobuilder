@@ -558,6 +558,15 @@ field_value_to_string(struct field* f, sqlite3_stmt* res, int index)
     time_t s;
     switch (f->type) {
         case REF:
+            {
+                struct entity* ref_entity;
+                $check(find_entity(g_entities, f->ref.eid, &ref_entity)==0);
+                struct field* ref_field;
+                $check(find_field(ref_entity->fields, f->ref.fid, &ref_field)==0);
+                sdsfree(ret);
+                ret = field_value_to_string(ref_field, res, index);
+            }
+            break;
         case TEXT:
             ret = sdscatprintf(ret, "%s", sqlite3_column_text(res, index));
             break;

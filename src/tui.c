@@ -668,8 +668,10 @@ show_lookup_form(struct entity*  e,
     intptr_t resel = -1;
     while (exit != 1) {
         newtListboxClear(f.entities_listbox);
-        query_in_listbox(
-          e, db, f.entities_listbox, f.search_term_buffer, ctx, order);
+        if ($iserror(query_in_listbox(
+          e, db, f.entities_listbox, f.search_term_buffer, ctx, order))) {
+            break;
+        }
         if (resel != -1)
             newtListboxSetCurrentByKey(f.entities_listbox, (void*)resel);
         struct newtExitStruct ee;

@@ -168,9 +168,7 @@ ref_field_filter(newtComponent entry, void* data, int ch, int cursor)
     }
     struct entity* e     = f->_data;
     sds            title = sdscatprintf(sdsempty(), "%s Lookup", _TR(e->name));
-    newtCenteredWindow(40, 20, title);
-    int key = show_lookup_form(f->_data, ld.db, NULL, &f->base->order, true);
-    newtPopWindow();
+    int key = show_lookup_form(title,f->_data, ld.db, NULL, &f->base->order, true);
     if (key == -2) return 0;
     f->_kvalue = key;
     sds v      = get_ref_value(ld.db, key, f->base->ref.eid, f->base->ref.fid);
@@ -270,15 +268,17 @@ cleanup:
 
 /* -- WINDOWS DIMENSION HELPERS -- */
 
-int
+struct window_size
 get_ideal_list_window_size(struct entity* e)
 {
     int          wcols, wrows;
     unsigned int width = 1;
+    unsigned int height = 1;
     unsigned int maxlw = 0;
 
     newtGetScreenSize(&wcols, &wrows);
     unsigned int max_width = wcols * 0.8;
+    height = wrows * 0.7;
 
     $foreach_hashed(struct field*, f, e->fields)
     {
@@ -290,7 +290,7 @@ get_ideal_list_window_size(struct entity* e)
     if (width < 60) width = 60;
     if (width > max_width) width = max_width;
 
-    return width;
+    return (struct window_size){width, height};
 }
 
 struct window_size
@@ -450,11 +450,9 @@ show_relation_list_view(newtComponent    parent,
     find_entity(g_entities, r->fk.eid, &re);
     newtComponentGetPosition(parent, &px, &py);
     title = sdscatprintf(title, "%s %ss", _TR(e->name), _TR(r->fk.eid));
-    newtCenteredWindow(get_ideal_list_window_size(re), 10, title);
     ctx.fname = r->fk.fid;
     ctx.k     = key;
-    show_lookup_form(re, db, &ctx, &r->order, false);
-    newtPopWindow();
+    show_lookup_form(title, re, db, &ctx, &r->order, false);
     sdsfree(title);
 }
 
@@ -625,7 +623,7 @@ query_build_error:
 }
 
 void
-lookup_form_setup(newt_lookup_form* f, int rows, int cols)
+lookup_form_setup(newt_lookup_form* f, int cols, int rows)
 {
     f->entities_listbox =
       newtListbox(0, 3, rows - 4, NEWT_FLAG_RETURNEXIT | NEWT_FLAG_SCROLL);
@@ -654,16 +652,17 @@ lookup_form_setup(newt_lookup_form* f, int rows, int cols)
 }
 
 int
-show_lookup_form(struct entity*  e,
+show_lookup_form(const char* title,
+                 struct entity*  e,
                  sqlite3*        db,
                  struct context* ctx,
-                 struct fpath*   order,
+                 struct order*   order,
                  bool            lookup_only)
 {
+    struct window_size size = get_ideal_list_window_size(e);
+    newtCenteredWindow(size.w, size.h, title);
     newt_lookup_form f = { .search_term_buffer = "" };
-    lookup_form_setup(&f,
-                      ctx == NULL ? 20 : 10,
-                      ctx == NULL ? 40 : get_ideal_list_window_size(e));
+    lookup_form_setup(&f, size.w, size.h);
     int      exit  = 0;
     intptr_t ret   = -2;
     intptr_t resel = -1;
@@ -708,6 +707,7 @@ show_lookup_form(struct entity*  e,
     }
     newtFormDestroy(f.form);
     newtPopHelpLine();
+    newtPopWindow();
     return ret;
 }
 
@@ -752,9 +752,7 @@ show_entities_form(sqlite3* db)
         newtFormRun(form, &ee);
         if (ee.reason == NEWT_EXIT_COMPONENT) {
             struct entity* sel = newtListboxGetCurrent(entities_listbox);
-            newtCenteredWindow(40, 20, _TR(sel->name));
-            int r = show_lookup_form(sel, db, NULL, NULL, false);
-            newtPopWindow();
+            int r = show_lookup_form(_TR(sel->name),sel, db, NULL, NULL, false);
         }
         if (ee.reason == NEWT_EXIT_HOTKEY) {
             if (ee.u.key == NEWT_KEY_F1) {

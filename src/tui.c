@@ -704,7 +704,8 @@ show_lookup_form(const char*     title,
             if (ee.u.key == NEWT_KEY_INSERT)
                 resel = show_entity_edit_form(e, db, -1, ctx);
             if (ee.u.key == NEWT_KEY_DELETE) {
-                intptr_t k = (intptr_t)newtListboxGetCurrent(f.entities_listbox);
+                intptr_t k =
+                  (intptr_t)newtListboxGetCurrent(f.entities_listbox);
                 archive_obj(e, db, k);
             }
             if (ee.u.key == NEWT_KEY_F12) exit = 1;

@@ -232,9 +232,8 @@ augment_entity_query_agg(struct entity*          p,
                     pqe.join =
                       sdscatprintf(pqe.join, " WHERE [%ss].Id=@id", e->name);
                 }
-                pqe.join = sdscatprintf(pqe.join,
-                                        " AND ([%ss]._archived IS NULL)",
-                                        r_entity->name);
+                pqe.join = sdscatprintf(
+                  pqe.join, " AND ([%ss]._archived IS NULL)", r_entity->name);
             }
             $check(from = sdscatprintf(from,
                                        template,

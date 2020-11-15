@@ -73,8 +73,9 @@ new_entity_table(struct entity* e)
     sds sql;
     $check(sql = sdsempty());
     $check(e);
-    const char* template = "CREATE TABLE [%ss](Id INTEGER PRIMARY KEY %s);";
-    wrapped_sql columns  = new_entity_columns(e);
+    const char* template =
+      "CREATE TABLE [%ss](Id INTEGER PRIMARY KEY, _archived INTEGER %s);";
+    wrapped_sql columns = new_entity_columns(e);
     $inspect(columns, error);
     $check(sql = sdscatprintf(sql, template, e->name, columns.v));
     sdsfree(columns.v);
@@ -493,16 +494,17 @@ wrapped_sql
 build_list_query(struct entity* e, struct context* ctx, struct order* order)
 {
     wrapped_sql ret;
-    const char* template = "SELECT %s from [%ss] %s WHERE (%s)";
-    sds         sql      = sdsempty();
-    wrapped_sql columns  = build_entity_query_columns(e, false);
-    wrapped_sql join     = build_entity_query_joins(e);
-    wrapped_sql filters  = build_list_filters(e);
+    const char* template =
+      "SELECT %s from [%ss] %s WHERE (([%ss]._archived IS NULL) AND (%s))";
+    sds         sql     = sdsempty();
+    wrapped_sql columns = build_entity_query_columns(e, false);
+    wrapped_sql join    = build_entity_query_joins(e);
+    wrapped_sql filters = build_list_filters(e);
     $inspect(columns, error);
     $inspect(join, error);
     $inspect(filters, error);
-    $check(
-      sql = sdscatprintf(sql, template, columns.v, e->name, join.v, filters.v));
+    $check(sql = sdscatprintf(
+             sql, template, columns.v, e->name, join.v, e->name, filters.v));
     if (ctx != NULL) {
         $check(sql = sdscatprintf(
                  sql, " AND [%ss].[%s] = %d", e->name, ctx->fname, ctx->k));
@@ -689,6 +691,16 @@ create_update_statement(struct entity* e)
     return final;
 }
 
+sds
+create_archive_statement(struct entity* e)
+{
+    sds         tmp   = sdsempty();
+    const char* sql   = "UPDATE [%ss] SET _archived=1 WHERE Id = @id;";
+    sds         final = sdscatprintf(sdsempty(), sql, e->name);
+    sdsfree(tmp);
+    return final;
+}
+
 $typedef(time_t) wrapped_time_t;
 wrapped_time_t
 parse_date_field(const char* str)
@@ -801,6 +813,30 @@ apply_form(struct entity_value* e, sqlite3* db, int key)
     }
     ret = (wrapped_key){ key };
 cleanup_sqlite:
+    sqlite3_finalize(res);
+cleanup_sql:
+    sdsfree(sql2);
+    return ret;
+}
+
+wrapped_key
+archive_obj(struct entity* e, sqlite3* db, int key)
+{
+    wrapped_key ret;
+    sds         sql2;
+    sql2 = create_archive_statement(e);
+    sqlite3_stmt* res;
+    $check(sqlite3_prepare_v2(db, sql2, -1, &res, 0) == SQLITE_OK,
+           ret.status,
+           sqlite3_errmsg(db),
+           cleanup_sql);
+    int idx = sqlite3_bind_parameter_index(res, "@id");
+    sqlite3_bind_int(res, idx, key);
+    $log_info("----------SQL DELETE\n%s key: %d", sql2, key);
+    if (sqlite3_step(res) == SQLITE_DONE) {
+        if (key <= 0) key = sqlite3_last_insert_rowid(db);
+    }
+    ret = (wrapped_key){ key };
     sqlite3_finalize(res);
 cleanup_sql:
     sdsfree(sql2);

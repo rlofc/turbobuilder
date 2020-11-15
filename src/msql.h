@@ -76,4 +76,7 @@ $typedef(int) wrapped_key;
 wrapped_key
 apply_form(struct entity_value* e, sqlite3* db, int key);
 
+wrapped_key
+archive_obj(struct entity* e, sqlite3* db, int key);
+
 #endif

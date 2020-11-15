@@ -647,6 +647,7 @@ lookup_form_setup(newt_lookup_form* f, int cols, int rows)
                           f->close_button,
                           NULL);
     newtFormAddHotKey(f->form, NEWT_KEY_INSERT);
+    newtFormAddHotKey(f->form, NEWT_KEY_DELETE);
 
     if (strcmp(f->search_term_buffer, "") != 0)
         newtFormSetCurrent(f->form, f->entities_listbox);
@@ -702,6 +703,10 @@ show_lookup_form(const char*     title,
         } else {
             if (ee.u.key == NEWT_KEY_INSERT)
                 resel = show_entity_edit_form(e, db, -1, ctx);
+            if (ee.u.key == NEWT_KEY_DELETE) {
+                intptr_t k = (intptr_t)newtListboxGetCurrent(f.entities_listbox);
+                archive_obj(e, db, k);
+            }
             if (ee.u.key == NEWT_KEY_F12) exit = 1;
             if (ee.u.key == NEWT_KEY_ESCAPE) exit = 1;
         }

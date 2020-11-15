@@ -432,8 +432,8 @@ build_entity_query_columns(struct entity* e, bool include_refid)
             if (include_refid) {
                 $check(columns = sdscatprintf(columns,
                                               ",[%ss].[%s],[%ss].[%s]",
-                                              cur_entity->name,
-                                              cur_field->name,
+                                              e->name,
+                                              f->name,
                                               cur_field->ref.eid,
                                               cur_field->ref.fid));
             } else {

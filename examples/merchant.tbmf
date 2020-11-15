@@ -3,7 +3,7 @@ Customer = entity {
     Address = field { type: text; size: 30; }
     Contact = field { type: text; size: 15; }
     Phone = field { type: text; size: 14; }
-    Orders = relation { ref: Order.Customers; sortby: Order.Date; }
+    Orders = relation { ref: Order.Customers; orderdesc: Order.Date; }
     Volume = field { type: auto; size: 9; listed: false; 
         value: Sum(Orders.Cost);
     }
@@ -78,7 +78,7 @@ WarehouseItem = entity {
 
 StockWithdraw = entity {
     Quantity = field { type: text; size: 5; listed: true; }
-    OrderItem = field { ref: OrderItem.Item; size: 20; listed: false; }
+    OrderItem = field { ref: OrderItem.Item; size: 20; listed: true; }
     Stock = field { ref: WarehouseItem.Warehouse; filter: OrderItem; size: 20; listed: true; }
 }
 

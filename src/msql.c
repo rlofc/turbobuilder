@@ -264,10 +264,19 @@ augment_entity_query_agg(struct entity*          p,
                                        pqe.where,
                                        "",
                                        uuid));
+            sdsfree(sum);
+            sdsfree(fr);
         }
+        sdsfree(tmp);
+        sdsfree(more_selects);
+        sdsfree(tmpjoins);
     }
+    sdsfree(gb);
     return (wrapped_qe){ (struct query_extensions){ select, from } };
 error:
+    sdsfree(gb);
+    sdsfree(from);
+    sdsfree(select);
     return $invalid(wrapped_qe);
 }
 

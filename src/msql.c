@@ -486,13 +486,14 @@ build_entity_query_columns(struct entity* e, bool include_refid)
                                   &next_field) == 0);
             }
             if (include_refid) {
-                $check(columns = sdscatprintf(columns,
-                                              ",[%ss].[%s],[%ss]._archived,[%ss].[%s]",
-                                              e->name,
-                                              f->name,
-                                              cur_field->ref.eid,
-                                              cur_field->ref.eid,
-                                              cur_field->ref.fid));
+                $check(columns =
+                         sdscatprintf(columns,
+                                      ",[%ss].[%s],[%ss]._archived,[%ss].[%s]",
+                                      e->name,
+                                      f->name,
+                                      cur_field->ref.eid,
+                                      cur_field->ref.eid,
+                                      cur_field->ref.fid));
             } else {
                 $check(columns = sdscatprintf(columns,
                                               ",[%ss].[%s]",
@@ -553,25 +554,111 @@ error:
     return $invalid(wrapped_sql);
 }
 
+sds
+get_value_by_field_name(struct entity* e,
+                        sqlite3*       db,
+                        int            key,
+                        const char*    fname)
+{
+    sds ret = sdsempty();
+    if (key <= 0) return ret;
+    sds sql;
+    sql = build_obj_query(e);
+    if (sql == NULL) return ret;
+    sqlite3_stmt* res;
+    $check(sqlite3_prepare_v2(db, sql, -1, &res, 0) == SQLITE_OK,
+           sqlite3_errmsg(db),
+           error);
+    int idx = sqlite3_bind_parameter_index(res, "@id");
+    sqlite3_bind_int(res, idx, key);
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        int i = 1;
+        $foreach_hashed(struct field*, f, e->fields)
+        {
+            if (f->type == REF) {
+                if (strcmp(fname, f->name) == 0) {
+                    ret = sdscatprintf(ret, "%d", sqlite3_column_int(res, i));
+                    break;
+                }
+                i++;
+                i++;
+            }
+            if (strcmp(fname, f->name) == 0) {
+                ret = field_value_to_string(f, res, i);
+                break;
+            }
+            i++;
+        }
+    }
+    sqlite3_reset(res);
+    sqlite3_finalize(res);
+error:
+    sdsfree(sql);
+    return ret;
+}
+
 wrapped_sql
-build_list_query(struct entity* e, struct context* ctx, struct order* order)
+build_list_query_context_filters(sqlite3*        db,
+                                 struct context* ctx,
+                                 struct entity*  e)
+{
+    sds sql = sdsempty();
+    if (ctx != NULL && ctx->source_entity == NULL) {
+        $check(sql = sdscatprintf(
+                 sql, " AND [%ss].[%s] = %d", e->name, ctx->fname, ctx->k));
+    } else {
+        if (ctx != NULL && ctx->source_field->base->filter != NULL) {
+            struct func* f = ctx->source_field->base->filter;
+            $foreach_hashed(struct field_value*, fv, ctx->source_entity->fields)
+            {
+                if (strcmp(fv->base->name, f->args[1]->atentity) == 0) {
+                    struct entity* r_entity;
+                    $check(find_entity(
+                             g_entities, fv->base->ref.eid, &r_entity) == 0);
+                    sds val = get_value_by_field_name(
+                      r_entity, db, fv->_kvalue, f->args[1]->atfield);
+                    const char* template = " AND [%ss].[%s] = '%s'";
+                    $check(sql = sdscatprintf(
+                             sql, template, e->name, f->args[0]->atfield, val));
+                    sdsfree(val);
+                }
+            }
+        }
+    }
+    return (wrapped_sql){ sql };
+error:
+    return $invalid(wrapped_sql);
+}
+
+wrapped_sql
+build_list_query(struct entity*  e,
+                 sqlite3*        db,
+                 struct context* ctx,
+                 struct order*   order)
 {
     wrapped_sql ret;
     const char* template =
-      "SELECT %s from [%ss] %s WHERE (([%ss]._archived IS NULL) AND (%s))";
-    sds         sql     = sdsempty();
-    wrapped_sql columns = build_entity_query_columns(e, false);
-    wrapped_sql join    = build_entity_query_joins(e);
-    wrapped_sql filters = build_list_filters(e);
+      "SELECT %s from [%ss] %s WHERE (([%ss]._archived IS NULL) AND (%s) %s)";
+    sds         sql             = sdsempty();
+    wrapped_sql columns         = build_entity_query_columns(e, false);
+    wrapped_sql join            = build_entity_query_joins(e);
+    wrapped_sql filters         = build_list_filters(e);
+    wrapped_sql context_filters = build_list_query_context_filters(db, ctx, e);
+
     $inspect(columns, error);
     $inspect(join, error);
     $inspect(filters, error);
-    $check(sql = sdscatprintf(
-             sql, template, columns.v, e->name, join.v, e->name, filters.v));
-    if (ctx != NULL) {
-        $check(sql = sdscatprintf(
-                 sql, " AND [%ss].[%s] = %d", e->name, ctx->fname, ctx->k));
-    }
+    $inspect(context_filters, error);
+
+    $check(sql = sdscatprintf(sql,
+                              template,
+                              columns.v,
+                              e->name,
+                              join.v,
+                              e->name,
+                              filters.v,
+                              context_filters.v));
+
     if (order != NULL) {
         if (order->fpath.fid)
             $check(sql = sdscatprintf(sql,
@@ -589,6 +676,7 @@ cleanup:
     sdsfree(columns.v);
     sdsfree(join.v);
     sdsfree(filters.v);
+    sdsfree(context_filters.v);
     return ret;
 }
 
@@ -841,7 +929,7 @@ init_fields(struct entity_value* e, sqlite3* db, int key)
             if (f->base->type == REF) {
                 f->_kvalue = sqlite3_column_int(res, i);
                 i++;
-                f->is_archived = (sqlite3_column_type(res, i)!=SQLITE_NULL);
+                f->is_archived = (sqlite3_column_type(res, i) != SQLITE_NULL);
                 i++;
             }
             sds v = field_value_to_string(f->base, res, i);

@@ -55,7 +55,9 @@ Variation = entity {
 SessionExercise = entity {
     Session = field { ref: Session.Date; size: 12; listed: true; }
     Index = field { type: text; size: 4; listed: true; }
-    Exercise = field { ref: Exercise.Name; size: 12; listed: true; }
+    Exercise = field { ref: Exercise.Name; size: 12; listed: true;
+        filter: RefEq(Trainee, Session.Trainee);
+    }
     Variation = field { ref: Variation.Name; size: 30; listed: true;}
     Sets = field { type: integer; size: 3; listed: true; }
     Reps = field { type: integer; size: 3; listed: true; }

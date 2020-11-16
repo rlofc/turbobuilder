@@ -210,6 +210,14 @@ field_defs <- _ '}' {
         parser->f->order.fpath.eid = sdsnew(c);
         parser->f->order.fpath.fid = sdsnew(a);
     }
+    / _ 'filter' _ ':' _ v:filter _ ';' field_defs {
+        struct t_parser * parser = auxil;
+        args_stack_element * item;
+        STACK_POP(parser->head, item);
+        parser->f->filter = item->arg->atfunc;
+        free(item->arg);
+        free(item);
+    }
     / _ 'value' _ ':' _ v:formula _ ';' field_defs { 
         struct t_parser * parser = auxil;
         args_stack_element * item;
@@ -248,6 +256,25 @@ field_defs <- _ '}' {
         printf("Invalid field definition "); 
     }
 
+filter <-  fname:identifier _ '(' _ formula_args _ ')' _ {
+        struct t_parser * parser = auxil;
+        int nargs = 0;
+        if (strcmp(fname, "RefEq") == 0) nargs = 2;
+        struct func * f = calloc(1, sizeof(struct func));
+        f->name = sdsnew(fname);
+        f->n_args = nargs;
+        for (int i = nargs-1; i >=0 ; --i) {
+            args_stack_element * item;
+            STACK_POP(parser->head, item);
+            f->args[i] = item->arg;
+            free(item);
+        }
+        args_stack_element * item = calloc(1, sizeof(args_stack_element));
+        item->arg = calloc(1, sizeof(struct arg));
+        item->arg->type = ATFUNC;
+        item->arg->atfunc = f;
+        STACK_PUSH(parser->head, item);
+    }
 
 formula <-  fname:identifier _ '(' _ formula_args _ ')' _ { 
         struct t_parser * parser = auxil;

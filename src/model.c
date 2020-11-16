@@ -170,6 +170,7 @@ cleanup_field(struct field* f)
         sdsfree(f->ref.fid);
         sdsfree(f->order.fpath.eid);
         sdsfree(f->order.fpath.fid);
+        cleanup_func(f->filter);
     }
     sdsfree(f->format);
     if (f->type == REAL) {

@@ -58,12 +58,21 @@ static sds output_buffer;
 OUTPUT_IN_BUFFER(info);
 OUTPUT_IN_BUFFER(debug);
 
+struct lookup_filter_data
+{
+    int                  k;
+    struct field_value*  fv;
+    struct entity_value* ev;
+    sqlite3*             db;
+};
+
 struct field_value_tui
 {
-    struct field_value* ef;
-    newtComponent       field_label;
-    newtComponent       field_entry;
-    UT_hash_handle      hh;
+    struct field_value*       ef;
+    struct lookup_filter_data lfd;
+    newtComponent             field_label;
+    newtComponent             field_entry;
+    UT_hash_handle            hh;
 };
 
 struct entity_value_tui
@@ -71,13 +80,6 @@ struct entity_value_tui
     struct entity_value*    ee;
     struct field_value_tui* fields_tui;
 };
-
-typedef struct
-{
-    struct entity*      e;
-    struct field_value* f;
-    sqlite3*            db;
-} lookup_data;
 
 struct window_size
 {
@@ -157,22 +159,25 @@ show_lookup_form(const char*     title,
                  struct order*   order,
                  bool            lookup_only);
 
-lookup_data ld;
-
 int
 ref_field_filter(newtComponent entry, void* data, int ch, int cursor)
 {
-    struct field_value* f = data;
+    struct field_value_tui* fvt = data;
+    struct field_value*     f   = fvt->lfd.fv;
     if (ch == 13 && f->_kvalue != 0) {
         return 13;
     }
-    struct entity* e     = f->_data;
-    sds            title = sdscatprintf(sdsempty(), "%s Lookup", _TR(e->name));
-    int            key =
-      show_lookup_form(title, f->_data, ld.db, NULL, &f->base->order, true);
+    struct entity* e = f->_data;
+    struct context ctx;
+    ctx.source_entity = fvt->lfd.ev;
+    ctx.source_field  = f;
+    ctx.k             = fvt->lfd.k;
+    sds title         = sdscatprintf(sdsempty(), "%s Lookup", _TR(e->name));
+    int key           = show_lookup_form(
+      title, f->_data, fvt->lfd.db, &ctx, &f->base->order, true);
     if (key == -2) return 0;
     f->_kvalue = key;
-    sds v      = get_ref_value(ld.db, key, f->base->ref.eid, f->base->ref.fid);
+    sds v = get_ref_value(fvt->lfd.db, key, f->base->ref.eid, f->base->ref.fid);
     newtEntrySet(entry, v, 1);
     sdsfree(v);
     return 0;
@@ -318,7 +323,10 @@ get_ideal_form_window_size(struct entity* e)
 }
 
 void
-add_form_fields(struct entity_value_tui* e, sqlite3* db, newtComponent form)
+add_form_fields(struct entity_value_tui* e,
+                struct context*          ctx,
+                sqlite3*                 db,
+                newtComponent            form)
 {
     unsigned int row = 1;
     unsigned int col = 1;
@@ -347,22 +355,26 @@ add_form_fields(struct entity_value_tui* e, sqlite3* db, newtComponent form)
                       ((f->ef->base->type == AUTO) ? NEWT_FLAG_DISABLED : 0));
         if (f->ef->is_archived) {
             newtEntrySetColors(f->field_entry,
-                    NEWT_COLORSET_CUSTOM(COLOR_ERROR),
-                    NEWT_COLORSET_CUSTOM(COLOR_ERROR));
+                               NEWT_COLORSET_CUSTOM(COLOR_ERROR),
+                               NEWT_COLORSET_CUSTOM(COLOR_ERROR));
         }
         if (f->ef->base->type == DATE) {
             if (f->ef->_init_value == NULL ||
-                    strlen((const char*)f->ef->_init_value) < 10)
+                strlen((const char*)f->ef->_init_value) < 10)
                 newtEntrySet(f->field_entry, "____-__-__", 0);
             newtEntrySetFilter(f->field_entry, date_field_filter, f->ef);
             newtEntrySetCursorPosition(f->field_entry, 0);
         }
         if (f->ef->base->type == REF) {
-            ld.db = db;
-            ld.f  = f->ef;
-            find_entity(g_entities, f->ef->base->ref.eid, &(ld.e));
-            f->ef->_data = ld.e;
-            newtEntrySetFilter(f->field_entry, ref_field_filter, f->ef);
+
+            struct entity* r_entity;
+            find_entity(g_entities, f->ef->base->ref.eid, &r_entity);
+            f->ef->_data = r_entity;
+            f->lfd.db    = db;
+            f->lfd.k     = ctx->k;
+            f->lfd.fv    = f->ef;
+            f->lfd.ev    = e->ee;
+            newtEntrySetFilter(f->field_entry, ref_field_filter, f);
         }
         col = col + f->ef->base->length + 1;
         newtFormAddComponents(form, f->field_label, f->field_entry, NULL);
@@ -468,15 +480,18 @@ int
 show_entity_form_view(struct entity_value_tui* e,
                       sqlite3*                 db,
                       void (*add_fields)(struct entity_value_tui*,
-                                         sqlite3* db,
+                                         struct context* ctx,
+                                         sqlite3*        db,
                                          newtComponent),
                       int key)
 {
     int                ret = -1;
     struct window_size s   = create_form_window(e->ee->base);
 
-    newtComponent form = newtForm(NULL, NULL, 0);
-    add_fields(e, db, form);
+    newtComponent  form = newtForm(NULL, NULL, 0);
+    struct context ctx;
+    ctx.k = key;
+    add_fields(e, &ctx, db, form);
     sds helpline = sdsempty();
     if (key > 0) {
         sdsfree(helpline);
@@ -605,7 +620,7 @@ query_in_listbox(struct entity*  e,
     sds           search_query = sdsempty();
     sqlite3_stmt* res;
 
-    wrapped_sql maybe_list_query = build_list_query(e, ctx, order);
+    wrapped_sql maybe_list_query = build_list_query(e, db, ctx, order);
     sds query_sql = $unwrap(maybe_list_query, status, query_build_error);
     $check(sqlite3_prepare_v2(db, query_sql, -1, &res, 0) == SQLITE_OK,
            "",

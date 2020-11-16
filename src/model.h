@@ -94,6 +94,7 @@ struct field
     struct order order;
     char*        format;
     bool         listed;
+    struct func* filter;
     struct func* autofunc;
     struct func* autocond;
 };

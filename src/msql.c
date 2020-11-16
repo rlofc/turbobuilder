@@ -487,9 +487,10 @@ build_entity_query_columns(struct entity* e, bool include_refid)
             }
             if (include_refid) {
                 $check(columns = sdscatprintf(columns,
-                                              ",[%ss].[%s],[%ss].[%s]",
+                                              ",[%ss].[%s],[%ss]._archived,[%ss].[%s]",
                                               e->name,
                                               f->name,
+                                              cur_field->ref.eid,
                                               cur_field->ref.eid,
                                               cur_field->ref.fid));
             } else {
@@ -839,6 +840,8 @@ init_fields(struct entity_value* e, sqlite3* db, int key)
         {
             if (f->base->type == REF) {
                 f->_kvalue = sqlite3_column_int(res, i);
+                i++;
+                f->is_archived = (sqlite3_column_type(res, i)!=SQLITE_NULL);
                 i++;
             }
             sds v = field_value_to_string(f->base, res, i);

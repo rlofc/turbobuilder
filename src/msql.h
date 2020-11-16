@@ -37,6 +37,7 @@ struct field_value
     char*          _ret_value;
     void*          _data;
     int            _kvalue;
+    bool           is_archived;
     bool           is_valid;
     UT_hash_handle hh;
 };

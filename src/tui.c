@@ -337,15 +337,22 @@ add_form_fields(struct entity_value_tui* e, sqlite3* db, newtComponent form)
         col            = col + strlen(label);
         const char* defv =
           (char*)f->ef->_init_value == NULL ? "" : (char*)f->ef->_init_value;
-        f->field_entry = newtEntry(col,
-                                   row,
-                                   defv,
-                                   f->ef->base->length,
-                                   (const char**)&(f->ef->_ret_value),
-                                   NEWT_FLAG_SCROLL);
+        f->field_entry =
+          newtEntry(col,
+                    row,
+                    defv,
+                    f->ef->base->length,
+                    (const char**)&(f->ef->_ret_value),
+                    NEWT_FLAG_SCROLL |
+                      ((f->ef->base->type == AUTO) ? NEWT_FLAG_DISABLED : 0));
+        if (f->ef->is_archived) {
+            newtEntrySetColors(f->field_entry,
+                    NEWT_COLORSET_CUSTOM(COLOR_ERROR),
+                    NEWT_COLORSET_CUSTOM(COLOR_ERROR));
+        }
         if (f->ef->base->type == DATE) {
             if (f->ef->_init_value == NULL ||
-                strlen((const char*)f->ef->_init_value) < 10)
+                    strlen((const char*)f->ef->_init_value) < 10)
                 newtEntrySet(f->field_entry, "____-__-__", 0);
             newtEntrySetFilter(f->field_entry, date_field_filter, f->ef);
             newtEntrySetCursorPosition(f->field_entry, 0);
@@ -629,7 +636,7 @@ lookup_form_setup(newt_lookup_form* f, int cols, int rows)
     f->entities_listbox =
       newtListbox(0, 3, rows - 4, NEWT_FLAG_RETURNEXIT | NEWT_FLAG_SCROLL);
     newtListboxSetWidth(f->entities_listbox, cols);
-    newtPushHelpLine("INSERT to add, F12 to exit");
+    newtPushHelpLine("INSERT to add, DEL to archive, F12 to exit");
     newtRefresh();
     f->form         = newtForm(NULL, NULL, 0);
     f->close_button = newtCompactButton(30, rows - 1, "Ok");
@@ -706,7 +713,14 @@ show_lookup_form(const char*     title,
             if (ee.u.key == NEWT_KEY_DELETE) {
                 intptr_t k =
                   (intptr_t)newtListboxGetCurrent(f.entities_listbox);
-                archive_obj(e, db, k);
+
+                if (newtWinChoice("Archive?",
+                                  "Yes",
+                                  "No",
+                                  "Are you sure you want to"
+                                  " archive this record?") == 1) {
+                    archive_obj(e, db, k);
+                }
             }
             if (ee.u.key == NEWT_KEY_F12) exit = 1;
             if (ee.u.key == NEWT_KEY_ESCAPE) exit = 1;
@@ -795,6 +809,7 @@ init_tui()
     newtInit();
     newtSetColor(NEWT_COLORSET_ROOTTEXT, "color025", "blue");
     newtSetColor(NEWT_COLORSET_CUSTOM(COLOR_ERROR), "white", "color124");
+    newtSetColor(NEWT_COLORSET_DISENTRY, "white", "color104");
     newtCls();
 }
 

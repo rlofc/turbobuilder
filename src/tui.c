@@ -58,14 +58,6 @@ static sds output_buffer;
 OUTPUT_IN_BUFFER(info);
 OUTPUT_IN_BUFFER(debug);
 
-struct lookup_filter_data
-{
-    int                  k;
-    struct field_value*  fv;
-    struct entity_value* ev;
-    sqlite3*             db;
-};
-
 struct field_value_tui
 {
     struct field_value*       ef;
@@ -152,12 +144,13 @@ destroy_entity_value(struct entity_value_tui* eetui)
 }
 
 int
-show_lookup_form(const char*     title,
-                 struct entity*  e,
-                 sqlite3*        db,
-                 struct context* ctx,
-                 struct order*   order,
-                 bool            lookup_only);
+show_lookup_form(const char*                title,
+                 struct entity*             e,
+                 sqlite3*                   db,
+                 struct context*            ctx,
+                 struct lookup_filter_data* lfd,
+                 struct order*              order,
+                 bool                       lookup_only);
 
 int
 ref_field_filter(newtComponent entry, void* data, int ch, int cursor)
@@ -167,14 +160,10 @@ ref_field_filter(newtComponent entry, void* data, int ch, int cursor)
     if (ch == 13 && f->_kvalue != 0) {
         return 13;
     }
-    struct entity* e = f->_data;
-    struct context ctx;
-    ctx.source_entity = fvt->lfd.ev;
-    ctx.source_field  = f;
-    ctx.k             = fvt->lfd.k;
-    sds title         = sdscatprintf(sdsempty(), "%s Lookup", _TR(e->name));
-    int key           = show_lookup_form(
-      title, f->_data, fvt->lfd.db, &ctx, &f->base->order, true);
+    struct entity* e     = f->_data;
+    sds            title = sdscatprintf(sdsempty(), "%s Lookup", _TR(e->name));
+    int            key   = show_lookup_form(
+      title, f->_data, fvt->lfd.db, NULL, &fvt->lfd, &f->base->order, true);
     if (key == -2) return 0;
     f->_kvalue = key;
     sds v = get_ref_value(fvt->lfd.db, key, f->base->ref.eid, f->base->ref.fid);
@@ -472,7 +461,7 @@ show_relation_list_view(newtComponent    parent,
     title     = sdscatprintf(title, "%s %ss", _TR(e->name), _TR(r->fk.eid));
     ctx.fname = r->fk.fid;
     ctx.k     = key;
-    show_lookup_form(title, re, db, &ctx, &r->order, false);
+    show_lookup_form(title, re, db, &ctx, NULL, &r->order, false);
     sdsfree(title);
 }
 
@@ -609,18 +598,19 @@ append_row_to_listbox(struct entity* e,
 }
 
 $status
-query_in_listbox(struct entity*  e,
-                 sqlite3*        db,
-                 newtComponent   entities_listbox,
-                 const char*     search_term,
-                 struct context* ctx,
-                 struct order*   order)
+query_in_listbox(struct entity*             e,
+                 sqlite3*                   db,
+                 newtComponent              entities_listbox,
+                 const char*                search_term,
+                 struct context*            ctx,
+                 struct lookup_filter_data* lfd,
+                 struct order*              order)
 {
     $status       status       = $okay;
     sds           search_query = sdsempty();
     sqlite3_stmt* res;
 
-    wrapped_sql maybe_list_query = build_list_query(e, db, ctx, order);
+    wrapped_sql maybe_list_query = build_list_query(e, db, ctx, lfd, order);
     sds query_sql = $unwrap(maybe_list_query, status, query_build_error);
     $check(sqlite3_prepare_v2(db, query_sql, -1, &res, 0) == SQLITE_OK,
            "",
@@ -676,12 +666,13 @@ lookup_form_setup(newt_lookup_form* f, int cols, int rows)
 }
 
 int
-show_lookup_form(const char*     title,
-                 struct entity*  e,
-                 sqlite3*        db,
-                 struct context* ctx,
-                 struct order*   order,
-                 bool            lookup_only)
+show_lookup_form(const char*                title,
+                 struct entity*             e,
+                 sqlite3*                   db,
+                 struct context*            ctx,
+                 struct lookup_filter_data* lfd,
+                 struct order*              order,
+                 bool                       lookup_only)
 {
     struct window_size size = get_ideal_list_window_size(e);
     newtCenteredWindow(size.w, size.h, title);
@@ -692,8 +683,13 @@ show_lookup_form(const char*     title,
     intptr_t resel = -1;
     while (exit != 1) {
         newtListboxClear(f.entities_listbox);
-        if ($iserror(query_in_listbox(
-              e, db, f.entities_listbox, f.search_term_buffer, ctx, order))) {
+        if ($iserror(query_in_listbox(e,
+                                      db,
+                                      f.entities_listbox,
+                                      f.search_term_buffer,
+                                      ctx,
+                                      lfd,
+                                      order))) {
             break;
         }
         if (resel != -1)
@@ -788,8 +784,8 @@ show_entities_form(sqlite3* db)
         newtFormRun(form, &ee);
         if (ee.reason == NEWT_EXIT_COMPONENT) {
             struct entity* sel = newtListboxGetCurrent(entities_listbox);
-            int            r =
-              show_lookup_form(_TR(sel->name), sel, db, NULL, NULL, false);
+            int            r   = show_lookup_form(
+              _TR(sel->name), sel, db, NULL, NULL, NULL, false);
         }
         if (ee.reason == NEWT_EXIT_HOTKEY) {
             if (ee.u.key == NEWT_KEY_F1) {

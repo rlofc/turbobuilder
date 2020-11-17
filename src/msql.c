@@ -611,30 +611,30 @@ error:
 }
 
 wrapped_sql
-build_list_query_context_filters(sqlite3*        db,
-                                 struct context* ctx,
-                                 struct entity*  e)
+build_list_query_context_filters(sqlite3*                   db,
+                                 struct context*            ctx,
+                                 struct lookup_filter_data* lfd,
+                                 struct entity*             e)
 {
     sds sql = sdsempty();
-    if (ctx != NULL && ctx->source_entity == NULL) {
+    if (ctx != NULL) {
         $check(sql = sdscatprintf(
                  sql, " AND [%ss].[%s] = %d", e->name, ctx->fname, ctx->k));
-    } else {
-        if (ctx != NULL && ctx->source_field->base->filter != NULL) {
-            struct func* f = ctx->source_field->base->filter;
-            $foreach_hashed(struct field_value*, fv, ctx->source_entity->fields)
-            {
-                if (strcmp(fv->base->name, f->args[1]->atentity) == 0) {
-                    struct entity* r_entity;
-                    $check(find_entity(
-                             g_entities, fv->base->ref.eid, &r_entity) == 0);
-                    sds val = get_value_by_field_name(
-                      r_entity, db, fv->_kvalue, f->args[1]->atfield);
-                    const char* template = " AND [%ss].[%s] = '%s'";
-                    $check(sql = sdscatprintf(
-                             sql, template, e->name, f->args[0]->atfield, val));
-                    sdsfree(val);
-                }
+    }
+    if (lfd != NULL && lfd->fv->base->filter != NULL) {
+        struct func* f = lfd->fv->base->filter;
+        $foreach_hashed(struct field_value*, fv, lfd->ev->fields)
+        {
+            if (strcmp(fv->base->name, f->args[1]->atentity) == 0) {
+                struct entity* r_entity;
+                $check(find_entity(g_entities, fv->base->ref.eid, &r_entity) ==
+                       0);
+                sds val = get_value_by_field_name(
+                  r_entity, db, fv->_kvalue, f->args[1]->atfield);
+                const char* template = " AND [%ss].[%s] = '%s'";
+                $check(sql = sdscatprintf(
+                         sql, template, e->name, f->args[0]->atfield, val));
+                sdsfree(val);
             }
         }
     }
@@ -644,19 +644,21 @@ error:
 }
 
 wrapped_sql
-build_list_query(struct entity*  e,
-                 sqlite3*        db,
-                 struct context* ctx,
-                 struct order*   order)
+build_list_query(struct entity*             e,
+                 sqlite3*                   db,
+                 struct context*            ctx,
+                 struct lookup_filter_data* lfd,
+                 struct order*              order)
 {
     wrapped_sql ret;
     const char* template =
       "SELECT %s from [%ss] %s WHERE (([%ss]._archived IS NULL) AND (%s) %s)";
-    sds         sql             = sdsempty();
-    wrapped_sql columns         = build_entity_query_columns(e, false);
-    wrapped_sql join            = build_entity_query_joins(e);
-    wrapped_sql filters         = build_list_filters(e);
-    wrapped_sql context_filters = build_list_query_context_filters(db, ctx, e);
+    sds         sql     = sdsempty();
+    wrapped_sql columns = build_entity_query_columns(e, false);
+    wrapped_sql join    = build_entity_query_joins(e);
+    wrapped_sql filters = build_list_filters(e);
+    wrapped_sql context_filters =
+      build_list_query_context_filters(db, ctx, lfd, e);
 
     $inspect(columns, error);
     $inspect(join, error);

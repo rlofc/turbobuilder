@@ -81,6 +81,10 @@ SessionExercise = entity {
     AverageIntensityOfSets = field { type: auto; size: 10; listed: false;
         value: AvgIfEq(SetsLog.Intensity, SetLogType.Name,set);
     }
+    ORM = field { type: auto; size: 10; listed: false;
+        value: Mul(Exercise.OneRepMax, Div(Exercise.OneRepMax, Exercise.OneRepMax));
+    }
+
 
 }
 
@@ -89,12 +93,12 @@ SessionExerciseSetLog = entity {
     Type = field { ref: SetLogType.Name; size: 10; listed: true; }
     Reps = field { type: integer; size: 3; listed: true; }
     Weight = field { type: real; size: 6; format: "%.2f"; listed: true; }
-    Notes = field { type: text; size: 10; listed: true; }
+    Notes = field { type: text; size: 30; listed: true; }
     Volume = field { type: auto; size: 10; listed: false;
         value: Mul(Weight,Reps);
     }
     Intensity = field { type: auto; size: 10; listed: false;
-        value: Div(Weight,Exercise.OneRepMax);
+        value: Div(Weight,Exercise.ORM);
     }
 }
 

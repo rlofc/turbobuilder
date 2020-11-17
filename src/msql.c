@@ -377,8 +377,21 @@ augment_entity_query_op_arg(struct arg*             arg,
         }
     }
     if (arg->type == ATREF) {
-        $check(select =
-                 sdscatprintf(select, "[%ss].%s", arg->atentity, arg->atfield));
+        struct field*  er;
+        struct entity* r_entity;
+        struct field*  r_field;
+        $check(find_field(e->fields, arg->atentity, &er) == 0);
+        $check(find_entity(g_entities, er->ref.eid, &r_entity) == 0);
+        $check(find_field(r_entity->fields, arg->atfield, &r_field) == 0);
+        if (r_field->type == AUTO) {
+            wrapped_qe a;
+            a = augment_entity_query_inner(
+              e, pr, r_entity, r_field, r_field->autofunc, pqe);
+            select = a.v.select;
+            from   = a.v.from;
+        } else
+            $check(select = sdscatprintf(
+                     select, "[%ss].%s", arg->atentity, arg->atfield));
     }
     return (wrapped_qe){ (struct query_extensions){ select, from } };
 error:
@@ -439,7 +452,7 @@ augment_entity_query_inner(struct entity*          p,
     if (strcmp(f->name, "Mul") == 0)
         return augment_entity_query_op(p, pr, e, ff, f, "*", pqe);
     if (strcmp(f->name, "Div") == 0)
-        return augment_entity_query_op(p, pr, e, ff, f, "/", pqe);
+        return augment_entity_query_op(p, pr, e, ff, f, "*1.0/", pqe);
     if (strcmp(f->name, "Sum") == 0)
         return augment_entity_query_nocond_agg(p, pr, e, ff, f, "SUM", pqe);
     if (strcmp(f->name, "Min") == 0)

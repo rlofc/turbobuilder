@@ -225,6 +225,9 @@ date_field_filter(newtComponent entry, void* data, int ch, int cursor)
                 goto cleanup;
         }
     }
+    if (ch == NEWT_KEY_ENTER) {
+        if (is_valid_date_str(val)) return NEWT_KEY_ENTER;
+    }
     if (ch == NEWT_KEY_BKSPC) ch = NEWT_KEY_LEFT;
     if (ch == NEWT_KEY_LEFT) {
         if (cursor == 5 || cursor == 8) {

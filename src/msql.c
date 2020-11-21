@@ -1127,15 +1127,15 @@ cleanup:
 
 /* -- UI FUNCTIONS -- */
 
-void
+$status
 init_fields(struct entity_value* e, sqlite3* db, int key)
 {
-    if (key <= 0) return;
-    sds sql;
-    sql = build_obj_query(e->base);
-    if (sql == NULL) return;
+    $status ret = $okay;
+    if (key <= 0) return $okay;
+    wrapped_sql sql = build_obj_query(e->base);
+    $inspect(sql, ret, exit);
     sqlite3_stmt* res;
-    $check(sqlite3_prepare_v2(db, sql, -1, &res, 0) == SQLITE_OK,
+    $check(sqlite3_prepare_v2(db, sql.v, -1, &res, 0) == SQLITE_OK,
            sqlite3_errmsg(db),
            error);
     int idx = sqlite3_bind_parameter_index(res, "@id");
@@ -1162,8 +1162,11 @@ init_fields(struct entity_value* e, sqlite3* db, int key)
     }
     sqlite3_reset(res);
     sqlite3_finalize(res);
+    ret = $okay;
 error:
-    sdsfree(sql);
+    sdsfree(sql.v);
+exit:
+    return ret;
 }
 
 wrapped_key

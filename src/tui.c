@@ -471,13 +471,19 @@ show_relation_list_view(newtComponent    parent,
     struct entity* re;
     struct context ctx;
 
-    find_entity(g_entities, r->fk.eid, &re);
+    $check(find_entity(g_entities, r->fk.eid, &re) == 0);
     newtComponentGetPosition(parent, &px, &py);
     title     = sdscatprintf(title, "%s %ss", _TR(e->name), _TR(r->fk.eid));
     ctx.fname = r->fk.fid;
     ctx.k     = key;
     show_lookup_form(title, re, db, &ctx, NULL, &r->order, false);
     sdsfree(title);
+    return;
+error:
+    $log_error("Error when attempting to show relation %s in entity %s",
+               r->name,
+               e->name);
+    return;
 }
 
 int
@@ -546,14 +552,16 @@ show_entity_form_view(struct entity_value_tui* e,
                     exit = 1;
                     show_relation_list_view(form, e->ee->base, r.v, key, db);
                     // Refresh
-                    init_fields(e->ee, db, key);
-                    exit = 1;
-                    $foreach_hashed(struct field_value_tui*, f, e->fields_tui)
-                    {
-                        const char* defv = (char*)f->ef->_init_value == NULL
-                                             ? ""
-                                             : (char*)f->ef->_init_value;
-                        newtEntrySet(f->field_entry, defv, 0);
+                    if ($isokay(init_fields(e->ee, db, key))) {
+                        exit = 1;
+                        $foreach_hashed(
+                          struct field_value_tui*, f, e->fields_tui)
+                        {
+                            const char* defv = (char*)f->ef->_init_value == NULL
+                                                 ? ""
+                                                 : (char*)f->ef->_init_value;
+                            newtEntrySet(f->field_entry, defv, 0);
+                        }
                     }
                 }
             }

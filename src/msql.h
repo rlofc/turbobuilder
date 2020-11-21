@@ -75,10 +75,10 @@ build_list_query(struct entity* e, sqlite3* db, struct context* ctx, struct look
 sds
 field_value_to_string(struct field* f, sqlite3_stmt* res, int index);
 
-sds
+wrapped_sql
 build_obj_query(struct entity* e);
 
-void
+$status
 init_fields(struct entity_value* e, sqlite3* db, int key);
 
 $typedef(int) wrapped_key;

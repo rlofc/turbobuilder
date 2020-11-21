@@ -155,7 +155,7 @@ typedef struct
     {                                                                          \
         $status v = (V).status;                                                \
         if (v.code != 0) {                                                     \
-            printf(#V " verification failed: %s\n", v.message);                \
+            $log_error(#V " verification failed: %s\n", v.message);                \
             goto error;                                                        \
         }                                                                      \
     }
@@ -164,7 +164,7 @@ typedef struct
     {                                                                          \
         $status v = (V).status;                                                \
         if (v.code != 0) {                                                     \
-            printf(#V " verification failed: %s\n", v.message);                \
+            $log_error(#V " verification failed: %s\n", v.message);                \
             goto E;                                                            \
         }                                                                      \
     }
@@ -173,8 +173,7 @@ typedef struct
     {                                                                          \
         $status v = (V).status;                                                \
         if (v.code != 0) {                                                     \
-            printf(#V " verification failed: %s\n", v.message);                \
-            S = ($status){ .code = -1, .message = M };                         \
+            S = v;\
             goto E;                                                            \
         }                                                                      \
     }

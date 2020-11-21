@@ -279,6 +279,7 @@ filter <-  fname:identifier _ '(' _ formula_args _ ')' _ {
 formula <-  fname:identifier _ '(' _ formula_args _ ')' _ { 
         struct t_parser * parser = auxil;
         int nargs = 0;
+        if (strcmp(fname, "Get") == 0) nargs = 1;
         if (strcmp(fname, "Sum") == 0) nargs = 1;
         if (strcmp(fname, "Min") == 0) nargs = 1;
         if (strcmp(fname, "Max") == 0) nargs = 1;
@@ -286,6 +287,7 @@ formula <-  fname:identifier _ '(' _ formula_args _ ')' _ {
         if (strcmp(fname, "RollingDaysAvg") == 0) nargs = 3;
         if (strcmp(fname, "RollingDaysSum") == 0) nargs = 3;
         if (strcmp(fname, "AvgIfEq") == 0) nargs = 3;
+        if (strcmp(fname, "CountIfEq") == 0) nargs = 3;
         if (strcmp(fname, "Count") == 0) nargs = 1;
         if (strcmp(fname, "Sub") == 0) nargs = 2;
         if (strcmp(fname, "Mul") == 0) nargs = 2;

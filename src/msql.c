@@ -34,10 +34,11 @@
 
 struct query_extensions
 {
-    sds select;
-    sds from;
-    sds join;
-    sds where;
+    sds  select;
+    sds  from;
+    sds  join;
+    sds  where;
+    bool cmx;
 };
 $typedef(struct query_extensions) wrapped_qe;
 
@@ -152,10 +153,33 @@ replace_string_in_sds(sds source, sds old, sds new)
         newjoin = sdscatprintf(newjoin, "[%s]%s", new, tokens[j]);
     }
     sdsfreesplitres(tokens, count);
-    sdsfree(old);
-    sdsfree(new);
     sdsfree(source);
     return newjoin;
+}
+
+struct efpair
+{
+    struct field*  f;
+    struct entity* e;
+} find_relation_field(struct entity* p, const char* ename, const char* fname)
+{
+    struct relation* p_relation = NULL;
+    struct field*    p_field    = NULL;
+    struct entity*   r_entity;
+    struct field*    r_field;
+    if (find_field(p->fields, ename, &p_field) != 0) {
+        if (find_relation(p->relations, ename, &p_relation) != 0)
+            return (struct efpair){ NULL, NULL };
+    }
+    if (p_relation != NULL) {
+        $check(find_entity(g_entities, p_relation->fk.eid, &r_entity) == 0);
+    } else {
+        $check(find_entity(g_entities, p_field->ref.eid, &r_entity) == 0);
+    }
+    $check(find_field(r_entity->fields, fname, &r_field) == 0);
+    return (struct efpair){ r_field, r_entity };
+error:
+    return (struct efpair){ NULL, NULL };
 }
 
 wrapped_qe
@@ -170,7 +194,8 @@ augment_entity_query_agg(struct entity*          p,
     sds select = sdsempty();
     sds from   = sdsempty();
     sds gb     = sdscatprintf(sdsempty(), "GROUP BY [%ss].[Id]", e->name);
-    const char* template = "(SELECT %s(%s) %s %s FROM %s %s %s %s %s) %s ";
+    const char* template =
+      "(SELECT %s(%s) %s %s %s FROM %s %s %s %s %s %s) %s %s";
     if (f->args[0]->type == ATREF) {
         struct relation* r;
         struct entity*   r_entity;
@@ -179,12 +204,18 @@ augment_entity_query_agg(struct entity*          p,
         $check(find_entity(g_entities, r->fk.eid, &r_entity) == 0);
         $check(find_field(r_entity->fields, f->args[0]->atfield, &r_field) ==
                0);
+
+        // This is the Id we provide our caller to use in their SELECT
+        // statement.
         sds uuid = sdscatprintf(
           sdsempty(), "uuid%s%s%s", r_field->name, e->name, ff->name);
         $check(select = sdscatprintf(select, "%s.%s", uuid, uuid));
 
-        wrapped_sql join         = build_entity_query_joins(r_entity);
-        sds         more_selects = sdsempty();
+        wrapped_sql join = build_entity_query_joins(r_entity, false);
+
+        // This additional select fragments are required to allow for binding
+        // cascaded entities Ids in join statements.
+        sds more_selects = sdsempty();
         $foreach_hashed(struct field*, f, e->fields)
         {
             if (f->type == REF) {
@@ -193,30 +224,43 @@ augment_entity_query_agg(struct entity*          p,
                     more_selects, ", [%ss].%s %s", e->name, f->name, f->name));
             }
         }
-        sds tmp = sdscatprintf(sdsempty(),
-                               "INNER JOIN [%ss] ON [%ss].[%s]=[%ss].[Id] ",
-                               e->name,
-                               r->fk.eid,
-                               r->fk.fid,
-                               e->name);
+
+        // This join extension is required when the fields is a reference
+        // to a simple (non-AUTO) field.
+        sds join_with_ref =
+          sdscatprintf(sdsempty(),
+                       "INNER JOIN [%ss] ON [%ss].[%s]=[%ss].[Id] ",
+                       e->name,
+                       r->fk.eid,
+                       r->fk.fid,
+                       e->name);
+
+        // This prefix augments anything coming in from cascaded
+        // AUTO fields, basically ensuring we are considering only
+        // active and associated records.
+        sds where_prefix =
+          sdscatprintf(sdsempty(), " WHERE ([%ss]._archived IS NULL)", e->name);
         if (p == NULL) {
-            tmp = sdscatprintf(tmp, "WHERE [%ss].Id=@id", e->name);
+            where_prefix =
+              sdscatprintf(where_prefix, " AND [%ss].Id=@id", e->name);
         }
 
-        sds tmpjoins = sdscatprintf(sdsempty(), "%s %s", tmp, pqe.join);
+        wrapped_qe a;
         if (r_field->type == AUTO) {
-            wrapped_qe a;
-            a = augment_entity_query_inner(
+            sds empty_where = sdsempty();
+            a               = augment_entity_query_inner(
               e,
               r,
               r_entity,
               r_field,
               r_field->autofunc,
-              (struct query_extensions){ .where = pqe.where,
-                                         .join  = tmpjoins });
+              (struct query_extensions){
+                .where = empty_where, .join = join_with_ref, .cmx = pqe.cmx });
+            sdsfree(empty_where);
+            $inspect(a);
             if (strcmp(a.v.from, "") == 0)
                 a.v.from = sdscatprintf(a.v.from, "[%ss]", r->fk.eid);
-            sds where = sdsempty();
+
             if (strstr(a.v.from, "SELECT") != NULL) {
                 sds searchstr =
                   sdscatprintf(sdsempty(), "[%ss]", r_entity->name);
@@ -227,52 +271,68 @@ augment_entity_query_agg(struct entity*          p,
                                r_entity->name,
                                r_field->name);
                 join.v = replace_string_in_sds(join.v, searchstr, otheruuid);
-            } else {
-                if (p == NULL) {
-                    pqe.join =
-                      sdscatprintf(pqe.join, " WHERE [%ss].Id=@id", e->name);
-                }
-                pqe.join = sdscatprintf(
-                  pqe.join, " AND ([%ss]._archived IS NULL)", r_entity->name);
+                sdsfree(searchstr);
+                sdsfree(otheruuid);
             }
-            $check(from = sdscatprintf(from,
-                                       template,
-                                       agg,
-                                       a.v.select,
-                                       uuid,
-                                       more_selects,
-                                       a.v.from,
-                                       join.v,
-                                       pqe.join,
-                                       r_field->type != AUTO ? pqe.where : "",
-                                       p != NULL ? gb : "",
-                                       uuid));
-        } else {
-            sds sum = sdsempty();
-            $check(sum = sdscatprintf(
-                     sum, "[%ss].%s", r->fk.eid, f->args[0]->atfield));
-            sds fr = sdscatprintf(sdsempty(), "%ss", r->fk.eid);
-            $check(from = sdscatprintf(from,
-                                       template,
-                                       agg,
-                                       sum,
-                                       uuid,
-                                       more_selects,
-                                       fr,
-                                       tmpjoins,
-                                       "",
-                                       pqe.where,
-                                       "",
-                                       uuid));
-            sdsfree(sum);
-            sdsfree(fr);
         }
-        sdsfree(tmp);
+        sds conditionals_selects = sdsempty();
+        $foreach_hashed(struct field*, f, r_entity->fields)
+        {
+            if (f->type == REF) {
+                $check(conditionals_selects = sdscatprintf(conditionals_selects,
+                                                           ", [%ss].%s %s",
+                                                           r_entity->name,
+                                                           f->name,
+                                                           f->name));
+            }
+        }
+        sds base_select = sdsempty();
+        $check(base_select = sdscatprintf(
+                 base_select, "[%ss].%s", r->fk.eid, f->args[0]->atfield));
+        sds fr = sdscatprintf(sdsempty(), "%ss", r->fk.eid);
+        sds conditionals_join =
+          sdscatprintf(sdsempty(),
+                       "INNER JOIN [%ss] ON [%s].[%s]=[%ss].[Id] ",
+                       e->name,
+                       uuid,
+                       r->fk.fid,
+                       e->name);
+        bool is_auto              = r_field->type == AUTO;
+        bool is_deep_auto         = is_auto && p != NULL;
+        bool is_deep_auto_in_cond = is_deep_auto && pqe.cmx;
+        $check(from =
+                 sdscatprintf(from,
+                              template,
+                              agg,
+                              is_auto ? a.v.select : base_select,
+                              uuid,
+                              more_selects,
+                              is_deep_auto_in_cond ? conditionals_selects : "",
+                              is_auto ? a.v.from : fr,
+                              is_auto ? join.v : join_with_ref,
+                              pqe.join,
+                              where_prefix,
+                              pqe.where,
+                              is_deep_auto ? gb : "",
+                              uuid,
+                              is_deep_auto_in_cond ? conditionals_join : ""));
+        if (is_auto) {
+            sdsfree(a.v.where);
+            sdsfree(a.v.select);
+            sdsfree(a.v.from);
+        }
+        sdsfree(conditionals_selects);
+        sdsfree(conditionals_join);
+        sdsfree(base_select);
+        sdsfree(fr);
         sdsfree(more_selects);
-        sdsfree(tmpjoins);
+        sdsfree(where_prefix);
+        sdsfree(join_with_ref);
+        sdsfree(uuid);
     }
     sdsfree(gb);
-    return (wrapped_qe){ (struct query_extensions){ select, from } };
+    return (wrapped_qe){ (struct query_extensions){
+      select, from, .where = sdsempty() } };
 error:
     sdsfree(gb);
     sdsfree(from);
@@ -291,10 +351,110 @@ augment_entity_query_nocond_agg(struct entity*          p,
                                 const char*             agg,
                                 struct query_extensions pqe)
 {
+    pqe.where     = sdsempty();
     wrapped_qe qe = augment_entity_query_agg(p, pr, e, ff, f, agg, pqe);
     $inspect(qe);
 error:
     return qe;
+}
+
+wrapped_qe
+augment_entity_query_get(struct entity*          p,
+                         struct relation*        pr,
+                         struct entity*          e,
+                         struct field*           ff,
+                         struct func*            f,
+                         struct query_extensions pqe)
+{
+    struct arg* arg    = f->args[0];
+    sds         select = sdsempty();
+    sds         from   = sdsempty();
+    sds         where  = sdsempty();
+    if (arg->type == ATREF) {
+        struct field*  er;
+        struct entity* r_entity;
+        struct field*  r_field;
+        $check(find_field(e->fields, arg->atentity, &er) == 0);
+        $check(find_entity(g_entities, er->ref.eid, &r_entity) == 0);
+        $check(find_field(r_entity->fields, arg->atfield, &r_field) == 0);
+        if (r_field->type == AUTO) {
+            wrapped_qe a;
+            a = augment_entity_query_inner(
+              e, pr, r_entity, r_field, r_field->autofunc, pqe);
+            $inspect(a);
+            select = a.v.select;
+            from   = a.v.from;
+            sdsfree(a.v.where);
+        } else {
+            if (p != NULL) {
+                from = sdscatprintf(from,
+                                    " INNER JOIN [%ss] ON [%ss].%s = [%ss].Id ",
+                                    r_entity->name,
+                                    e->name,
+                                    er->name,
+                                    r_entity->name);
+            }
+            $check(select = sdscatprintf(
+                     select, "[%ss].%s", arg->atentity, arg->atfield));
+        }
+    }
+    return (
+      wrapped_qe){ (struct query_extensions){ select, from, .where = where } };
+error:
+    sdsfree(select);
+    sdsfree(from);
+    sdsfree(where);
+    return $invalid(wrapped_qe);
+}
+
+wrapped_qe
+augment_entity_query_if_cond_agg_arg(struct arg*             arg,
+                                     struct entity*          p,
+                                     struct relation*        pr,
+                                     struct entity*          e,
+                                     struct func*            f,
+                                     struct query_extensions pqe)
+{
+    wrapped_qe arg2qe;
+    arg2qe.v.select = sdsempty();
+    arg2qe.v.join   = sdsempty();
+    struct efpair arg2ef;
+    if (arg->type == ATFIELD) {
+        arg2qe.v.select =
+          sdscatprintf(arg2qe.v.select, "[%ss].%s", e->name, arg->atfield);
+    }
+    if (arg->type == ATREF) {
+        arg2ef = find_relation_field(e, arg->atentity, arg->atfield);
+        if (arg2ef.f->type == AUTO) {
+            arg2qe = augment_entity_query_inner(
+              e, pr, arg2ef.e, arg2ef.f, arg2ef.f->autofunc, pqe);
+            arg2qe.v.join =
+              sdscatprintf(arg2qe.v.from,
+                           " INNER JOIN [%ss] on [%ss].id = [%ss].%s ",
+                           arg2ef.e->name,
+                           arg2ef.e->name,
+                           e->name,
+                           arg->atentity);
+        } else {
+            if (strcmp(f->args[0]->atentity, arg->atentity) == 0) {
+                struct relation* r;
+                find_relation(e->relations, f->args[0]->atentity, &r);
+                arg2qe.v.select = sdscatprintf(
+                  arg2qe.v.select, "[%ss].%s", r->fk.eid, arg->atfield);
+            } else {
+                arg2qe.v.select = sdscatprintf(
+                  arg2qe.v.select, "[%ss].%s", arg2ef.e->name, arg->atfield);
+                arg2qe.v.join =
+                  sdscatprintf(arg2qe.v.join,
+                               " INNER JOIN [%ss] ON [%ss].Id = [%ss].%s ",
+                               arg2ef.e->name,
+                               arg2ef.e->name,
+                               e->name,
+                               arg->atentity);
+            }
+        }
+    }
+    return arg2qe;
 }
 
 wrapped_qe
@@ -307,17 +467,24 @@ augment_entity_query_if_cond_agg(struct entity*          p,
                                  const char*             op,
                                  struct query_extensions pqe)
 {
-    const char* template = " AND [%ss].%s %s '%s'";
-    sds where_addition   = sdscatprintf(sdsempty(),
-                                      template,
-                                      f->args[1]->atentity,
-                                      f->args[1]->atfield,
-                                      op,
-                                      f->args[2]->atfield);
-
-    pqe.where     = where_addition;
+    wrapped_qe arg1qe;
+    wrapped_qe arg2qe;
+    pqe.cmx              = true;
+    const char* template = " AND %s %s %s";
+    arg1qe = augment_entity_query_if_cond_agg_arg(f->args[1], p, pr, e, f, pqe);
+    arg2qe = augment_entity_query_if_cond_agg_arg(f->args[2], p, pr, e, f, pqe);
+    sds where_addition =
+      sdscatprintf(sdsempty(), template, arg1qe.v.select, op, arg2qe.v.select);
+    pqe.where = where_addition;
+    pqe.join  = sdscatprintf(sdsempty(), "%s %s", arg1qe.v.join, arg2qe.v.join);
     wrapped_qe qe = augment_entity_query_agg(p, pr, e, ff, f, agg, pqe);
     $inspect(qe);
+    sdsfree(arg1qe.v.join);
+    sdsfree(arg2qe.v.join);
+    sdsfree(arg1qe.v.select);
+    sdsfree(arg2qe.v.select);
+    sdsfree(pqe.where);
+    sdsfree(pqe.join);
 error:
     return qe;
 }
@@ -333,6 +500,7 @@ augment_entity_query_date_cond_agg(struct entity*          p,
                                    const char*             tdelta_template,
                                    struct query_extensions pqe)
 {
+    pqe.cmx              = true;
     const char* template = " AND DATE([%s].%s,'unixepoch')%sDATE('now','%s')";
     sds tdelta = sdscatprintf(sdsempty(), tdelta_template, f->args[2]->atfield);
     sds where_addition = sdscatprintf(sdsempty(),
@@ -358,11 +526,16 @@ augment_entity_query_op_arg(struct arg*             arg,
 {
     sds select = sdsempty();
     sds from   = sdsempty();
+    sds where  = sdsempty();
     if (arg->type == ATFUNC) {
         wrapped_qe t =
           augment_entity_query_inner(p, pr, e, ff, arg->atfunc, pqe);
+        $inspect(t);
         $check(select = sdscatprintf(select, "%s", t.v.select));
         $check(from = sdscatprintf(from, "%s", t.v.from));
+        sdsfree(t.v.where);
+        sdsfree(t.v.select);
+        sdsfree(t.v.from);
     }
     if (arg->type == ATFIELD) {
         struct field* of;
@@ -370,10 +543,15 @@ augment_entity_query_op_arg(struct arg*             arg,
         if (of->type == AUTO) {
             wrapped_qe t =
               augment_entity_query_inner(p, pr, e, of, of->autofunc, pqe);
+            $inspect(t);
             $check(select = sdscatprintf(select, "%s", t.v.select));
+            sdsfree(t.v.where);
+            sdsfree(t.v.select);
+            sdsfree(t.v.from);
         } else {
             $check(select =
                      sdscatprintf(select, "[%ss].%s", e->name, arg->atfield));
+            where = pqe.where;
         }
     }
     if (arg->type == ATREF) {
@@ -387,13 +565,16 @@ augment_entity_query_op_arg(struct arg*             arg,
             wrapped_qe a;
             a = augment_entity_query_inner(
               e, pr, r_entity, r_field, r_field->autofunc, pqe);
+            $inspect(a);
             select = a.v.select;
             from   = a.v.from;
+            sdsfree(a.v.where);
         } else
             $check(select = sdscatprintf(
                      select, "[%ss].%s", arg->atentity, arg->atfield));
     }
-    return (wrapped_qe){ (struct query_extensions){ select, from } };
+    return (
+      wrapped_qe){ (struct query_extensions){ select, from, .where = where } };
 error:
     sdsfree(select);
     sdsfree(from);
@@ -411,6 +592,7 @@ augment_entity_query_op(struct entity*          p,
 {
     sds select           = sdsempty();
     sds from             = sdsempty();
+    sds where            = sdsempty();
     const char* template = "(%s %s %s)";
 
     wrapped_qe arg1, arg0;
@@ -427,11 +609,15 @@ augment_entity_query_op(struct entity*          p,
         $check(from = sdscatprintf(from, "%s", arg1.v.from));
     if (sdslen(arg1.v.from) == 0 && sdslen(arg0.v.from) > 0)
         $check(from = sdscatprintf(from, "%s", arg0.v.from));
+    $check(where = sdscatprintf(where, "%s%s", arg0.v.where, arg1.v.where));
+    // sdsfree(arg1.v.where);
+    // sdsfree(arg0.v.where);
     sdsfree(arg1.v.select);
     sdsfree(arg0.v.select);
     sdsfree(arg1.v.from);
     sdsfree(arg0.v.from);
-    return (wrapped_qe){ (struct query_extensions){ select, from } };
+    return (
+      wrapped_qe){ (struct query_extensions){ select, from, .where = where } };
 
 error:
     sdsfree(select);
@@ -447,6 +633,8 @@ augment_entity_query_inner(struct entity*          p,
                            struct func*            f,
                            struct query_extensions pqe)
 {
+    if (strcmp(f->name, "Get") == 0)
+        return augment_entity_query_get(p, pr, e, ff, f, pqe);
     if (strcmp(f->name, "Sub") == 0)
         return augment_entity_query_op(p, pr, e, ff, f, "-", pqe);
     if (strcmp(f->name, "Mul") == 0)
@@ -470,6 +658,9 @@ augment_entity_query_inner(struct entity*          p,
     if (strcmp(f->name, "AvgIfEq") == 0)
         return augment_entity_query_if_cond_agg(
           p, pr, e, ff, f, "AVG", "=", pqe);
+    if (strcmp(f->name, "CountIfEq") == 0)
+        return augment_entity_query_if_cond_agg(
+          p, pr, e, ff, f, "Count", "=", pqe);
     if (strcmp(f->name, "Count") == 0)
         return augment_entity_query_nocond_agg(p, pr, e, ff, f, "COUNT", pqe);
 
@@ -524,10 +715,11 @@ build_entity_query_columns(struct entity* e, bool include_refid)
               e,
               f,
               f->autofunc,
-              (struct query_extensions){ .where = sdsempty(),
-                                         .join  = sdsempty() });
+              (struct query_extensions){
+                .where = sdsempty(), .join = sdsempty(), .cmx = false });
             $inspect(a, error);
             columns = sdscatprintf(columns, ",%s", a.v.select);
+            sdsfree(a.v.where);
             sdsfree(a.v.select);
             sdsfree(a.v.from);
             $check(columns);
@@ -546,8 +738,7 @@ wrapped_sql
 build_list_filters(struct entity* e)
 {
     const char* inner_template = " OR [%ss].[%s] LIKE @name";
-    sds         w              = sdsempty();
-    w                          = sdscatprintf(w, "0");
+    sds         w              = sdscatprintf(sdsempty(), "0");
     $foreach_hashed(struct field*, f, e->fields)
     {
         if (f->listed) {
@@ -575,11 +766,10 @@ get_value_by_field_name(struct entity* e,
 {
     sds ret = sdsempty();
     if (key <= 0) return ret;
-    sds sql;
-    sql = build_obj_query(e);
-    if (sql == NULL) return ret;
+    wrapped_sql sql = build_obj_query(e);
+    $inspect(sql, exit);
     sqlite3_stmt* res;
-    $check(sqlite3_prepare_v2(db, sql, -1, &res, 0) == SQLITE_OK,
+    $check(sqlite3_prepare_v2(db, sql.v, -1, &res, 0) == SQLITE_OK,
            sqlite3_errmsg(db),
            error);
     int idx = sqlite3_bind_parameter_index(res, "@id");
@@ -606,7 +796,8 @@ get_value_by_field_name(struct entity* e,
     sqlite3_reset(res);
     sqlite3_finalize(res);
 error:
-    sdsfree(sql);
+    sdsfree(sql.v);
+exit:
     return ret;
 }
 
@@ -655,7 +846,7 @@ build_list_query(struct entity*             e,
       "SELECT %s from [%ss] %s WHERE (([%ss]._archived IS NULL) AND (%s) %s)";
     sds         sql     = sdsempty();
     wrapped_sql columns = build_entity_query_columns(e, false);
-    wrapped_sql join    = build_entity_query_joins(e);
+    wrapped_sql join    = build_entity_query_joins(e, true);
     wrapped_sql filters = build_list_filters(e);
     wrapped_sql context_filters =
       build_list_query_context_filters(db, ctx, lfd, e);
@@ -695,45 +886,51 @@ cleanup:
     return ret;
 }
 
-sds
+wrapped_sql
 build_obj_query(struct entity* e)
 {
     const char* template = "SELECT %s from [%ss] %s %s WHERE [%ss].Id = @id;";
-    sds         ret      = sdsempty();
+    sds         sql      = sdsempty();
     wrapped_sql columns  = build_entity_query_columns(e, true);
     $inspect(columns, error);
-    wrapped_sql join = build_entity_query_joins(e);
-    $inspect(join, error);
+    wrapped_sql join = build_entity_query_joins(e, false);
+    $inspect(join, error2);
     sds froms = sdsempty();
     $foreach_hashed(struct field*, f, e->fields)
     {
         if (f->type == AUTO) {
-            wrapped_qe a;
-            a = augment_entity_query_inner(
-              NULL,
-              NULL,
-              e,
-              f,
-              f->autofunc,
-              (struct query_extensions){ .where = sdsempty(),
-                                         .join  = sdsempty() });
+            wrapped_qe              a;
+            struct query_extensions pqe = { .select = sdsempty(),
+                                            .where  = sdsempty(),
+                                            .join   = sdsempty(),
+                                            .from   = sdsempty(),
+                                            .cmx    = false };
+            a = augment_entity_query_inner(NULL, NULL, e, f, f->autofunc, pqe);
             $inspect(a, error);
             if (strcmp(a.v.from, "") != 0) $check(froms = sdscat(froms, ","));
             $check(froms = sdscat(froms, a.v.from));
+            sdsfree(pqe.select);
+            sdsfree(pqe.where);
+            sdsfree(pqe.join);
+            sdsfree(pqe.from);
             sdsfree(a.v.select);
             sdsfree(a.v.from);
         }
     }
 
-    $check(ret = sdscatprintf(
-             ret, template, columns.v, e->name, froms, join.v, e->name));
+    $check(sql = sdscatprintf(
+             sql, template, columns.v, e->name, froms, join.v, e->name));
     sdsfree(froms);
     $log_info("----------------- build obj query");
-    $log_info("SQL is %s", ret);
-error:
+    $log_info("SQL is %s", sql);
     sdsfree(columns.v);
     sdsfree(join.v);
-    return ret;
+    return (wrapped_sql){ sql };
+error2:
+    sdsfree(join.v);
+error:
+    sdsfree(columns.v);
+    return $invalid(wrapped_sql);
 }
 
 sds

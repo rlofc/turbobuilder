@@ -113,12 +113,13 @@ error:
 }
 
 wrapped_sql
-build_entity_query_joins(struct entity* e)
+build_entity_query_joins(struct entity* e, bool listed_only)
 {
     sds join;
     $check(join = sdsempty());
     $foreach_hashed(struct field*, f, e->fields)
     {
+        if (listed_only && f->listed == false) break;
         struct entity* next_entity = e;
         struct field*  next_field  = f;
         while (next_field->type == REF) {
@@ -141,6 +142,7 @@ error:
     if (join != NULL) sdsfree(join);
     return $invalid(wrapped_sql);
 }
+
 sds
 replace_string_in_sds(sds source, sds old, sds new)
 {
@@ -675,6 +677,7 @@ build_entity_query_columns(struct entity* e, bool include_refid)
     $check(columns = sdscatprintf(columns, "[%ss].Id", e->name));
     $foreach_hashed(struct field*, f, e->fields)
     {
+        if (f->listed == false && include_refid == false) break;
         struct entity* next_entity = e;
         struct field*  next_field  = f;
         struct entity* cur_entity  = next_entity;

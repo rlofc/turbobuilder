@@ -34,13 +34,14 @@ typedef enum
     TEXT,
     DATE,
     INTEGER,
+    BOOLEAN,
     REAL,
     REF,
     AUTO
 } ftype;
 
 static const char* FTYPES[] = { "UNKNOWN", "TEXT",    "INTEGER", "INTEGER",
-                                "REAL",    "INTEGER", "*******" };
+                                "INTEGER", "REAL",    "INTEGER", "*******" };
 
 struct fpath
 {

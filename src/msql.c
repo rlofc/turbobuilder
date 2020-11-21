@@ -950,6 +950,10 @@ field_value_to_string(struct field* f, sqlite3_stmt* res, int index)
         case TEXT:
             ret = sdscatprintf(ret, "%s", sqlite3_column_text(res, index));
             break;
+        case BOOLEAN:
+            ret = sdscatprintf(
+              ret, "%s", sqlite3_column_int(res, index) ? "X" : " ");
+            break;
         case INTEGER:
             ret = sdscatprintf(ret, "%d", sqlite3_column_int(res, index));
             break;
@@ -1096,6 +1100,8 @@ bind_sql_params(struct entity_value* e, sqlite3_stmt* res, int key)
         int idx = sqlite3_bind_parameter_index(res, fname);
         if (f->base->type == REF) {
             sqlite3_bind_int(res, idx, f->_kvalue);
+        } else if (f->base->type == BOOLEAN) {
+            sqlite3_bind_int(res, idx, f->_bool_value == 'X' ? 1 : 0);
         } else if (f->base->type == DATE) {
             wrapped_time_t wt = parse_date_field((const char*)f->_ret_value);
             time_t         t  = $unwrap(wt, ret, cleanup);

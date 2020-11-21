@@ -337,14 +337,26 @@ add_form_fields(struct entity_value_tui* e,
         col            = col + strlen(label);
         const char* defv =
           (char*)f->ef->_init_value == NULL ? "" : (char*)f->ef->_init_value;
-        f->field_entry =
-          newtEntry(col,
-                    row,
-                    defv,
-                    f->ef->base->length,
-                    (const char**)&(f->ef->_ret_value),
-                    NEWT_FLAG_SCROLL |
-                      ((f->ef->base->type == AUTO) ? NEWT_FLAG_DISABLED : 0));
+        if (f->ef->base->type == BOOLEAN) {
+            f->field_entry = newtCheckbox(
+              col,
+              row,
+              "",
+              defv[0],
+              " X",
+              (char*)&(f->ef->_bool_value));
+            newtCheckboxSetFlags(f->field_entry,
+                    NEWT_FLAG_CHECKBOX, NEWT_FLAGS_SET);
+        } else {
+            f->field_entry = newtEntry(
+              col,
+              row,
+              defv,
+              f->ef->base->length,
+              (const char**)&(f->ef->_ret_value),
+              NEWT_FLAG_SCROLL |
+                ((f->ef->base->type == AUTO) ? NEWT_FLAG_DISABLED : 0));
+        }
         if (f->ef->is_archived) {
             newtEntrySetColors(f->field_entry,
                                NEWT_COLORSET_CUSTOM(COLOR_ERROR),

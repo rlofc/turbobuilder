@@ -239,6 +239,7 @@ field_defs <- _ '}' {
             if (strcmp(v, "real") == 0) parser->f->type = REAL;
             if (strcmp(v, "ref") == 0) parser->f->type = REF;
             if (strcmp(v, "date") == 0) parser->f->type = DATE;
+            if (strcmp(v, "boolean") == 0) parser->f->type = BOOLEAN;
             if (strcmp(v, "auto") == 0) parser->f->type = AUTO;
             if (parser->f->type == UNKNOWN) {
                 parser->error = 1;

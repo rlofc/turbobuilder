@@ -35,6 +35,7 @@ struct field_value
         unsigned char*       _init_value;
     };
     char*          _ret_value;
+    char           _bool_value;
     void*          _data;
     int            _kvalue;
     bool           is_archived;

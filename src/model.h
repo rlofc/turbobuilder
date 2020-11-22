@@ -117,7 +117,7 @@ struct entity
     char*            name;
     struct field*    fields;
     struct relation* relations;
-} entity;
+};
 
 struct label
 {

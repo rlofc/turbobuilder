@@ -303,6 +303,7 @@ get_ideal_form_window_size(struct entity* e)
     unsigned int maxlw = 0;
     $foreach_hashed(struct field*, f, e->fields)
     {
+        if (f->hidden) continue;
         if (col + strlen(f->name) + 2 + f->length + 1 > max_width) {
             col = 1;
             row = row + 2;
@@ -326,6 +327,7 @@ add_form_fields(struct entity_value_tui* e,
     struct window_size s = get_ideal_form_window_size(e->ee->base);
     $foreach_hashed(struct field_value_tui*, f, e->fields_tui)
     {
+        if (f->ef->base->hidden) continue;
         if (col + strlen(f->ef->base->name) + 2 + f->ef->base->length + 1 >
             s.w) {
             col = 1;
@@ -557,6 +559,7 @@ show_entity_form_view(struct entity_value_tui* e,
                         $foreach_hashed(
                           struct field_value_tui*, f, e->fields_tui)
                         {
+                            if (f->ef->base->hidden) continue;
                             const char* defv = (char*)f->ef->_init_value == NULL
                                                  ? ""
                                                  : (char*)f->ef->_init_value;

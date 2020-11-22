@@ -199,6 +199,10 @@ field_defs <- _ '}' {
         struct t_parser * parser = auxil;
         if (strcmp(b, "true") == 0) parser->f->listed = true;
     }
+    / _ 'hidden' _ ':' _ b:identifier _ ';' field_defs {
+        struct t_parser * parser = auxil;
+        if (strcmp(b, "true") == 0) parser->f->hidden = true;
+    }
     / _ 'ref' _ ':' _ c:identifier '.' a:identifier _ ';' field_defs { 
         struct t_parser * parser = auxil;
         parser->f->type = REF;

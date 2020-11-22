@@ -20,7 +20,7 @@ Session = entity {
     Date = field { type: date; size: 12; listed: true; }
     Description = field { type: text; size: 30; listed: true; }
     Exercises = relation { ref: SessionExercise.Session; orderasc: SessionExercise.Index;}
-    SetLogTypeToCount = field { type:auto; size: 10; listed: false;
+    SetLogTypeToCount = field { type:auto; size: 10; listed: false; hidden: true;
         value: Get(Trainee.SetLogTypeToCount);
     }
     AverageIntensity = field { type: auto; size: 10; listed: false;

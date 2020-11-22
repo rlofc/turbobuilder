@@ -299,6 +299,7 @@ augment_entity_query_agg(struct entity*          p,
                        uuid,
                        r->fk.fid,
                        e->name);
+        bool is_deep              = p != NULL;
         bool is_auto              = r_field->type == AUTO;
         bool is_deep_auto         = is_auto && p != NULL;
         bool is_deep_auto_in_cond = is_deep_auto && pqe.cmx;
@@ -315,7 +316,7 @@ augment_entity_query_agg(struct entity*          p,
                               pqe.join,
                               where_prefix,
                               pqe.where,
-                              is_deep_auto ? gb : "",
+                              is_deep ? gb : "",
                               uuid,
                               is_deep_auto_in_cond ? conditionals_join : ""));
         if (is_auto) {

@@ -1084,7 +1084,7 @@ wrapped_time_t
 parse_date_field(const char* str)
 {
     struct tm ti = { 0 };
-    if (sscanf(str, "%d-%d-%d", &ti.tm_year, &ti.tm_mon, &ti.tm_mday) != 3) {
+    if (sscanf(str, "%4d-%2d-%2d", &ti.tm_year, &ti.tm_mon, &ti.tm_mday) != 3) {
         return $invalid(wrapped_time_t);
     }
     ti.tm_year -= 1900;

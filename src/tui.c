@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <wchar.h>
 
 #include "core/iterators.h"
@@ -179,7 +180,7 @@ is_valid_date_str(const char* dstr)
 {
     int d, m, y;
     int daysinmonth[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-    if (sscanf(dstr, "%i-%i-%i", &y, &m, &d) != 3) return false;
+    if (sscanf(dstr, "%4d-%2d-%2d", &y, &m, &d) != 3) return false;
     if (y % 400 == 0 || (y % 100 != 0 && y % 4 == 0)) daysinmonth[1] = 29;
     return (m < 13 && d > 0 && d <= daysinmonth[m - 1]);
 }
@@ -196,6 +197,34 @@ date_field_ch_at_cursor_is_valid(const char* val, int ch, int cursor)
              (cursor == 9 && val[cursor - 1] == '0' && ch == 48 + 0));
 }
 
+void
+spin_date_value(newtComponent entry, int days)
+{
+    sds    val = sdsnew(newtEntryGetValue(entry));
+    time_t rawtime;
+    char   buf[80];
+    if (is_valid_date_str(val)) {
+        struct tm ti = { 0 };
+        if (sscanf(val, "%4d-%2d-%2d", &ti.tm_year, &ti.tm_mon, &ti.tm_mday) !=
+            3) {
+            time(&rawtime);
+        } else {
+            ti.tm_year -= 1900;
+            ti.tm_mon -= 1;
+            ti.tm_mday += days;
+            ti.tm_isdst = -1;
+            rawtime     = mktime(&ti);
+        }
+    } else {
+        time(&rawtime);
+    }
+    struct tm* timeinfo;
+    timeinfo = localtime(&rawtime);
+    strftime(buf, sizeof(buf), "%Y-%m-%d", timeinfo);
+    newtEntrySet(entry, buf, 0);
+    sdsfree(val);
+}
+
 int
 date_field_filter(newtComponent entry, void* data, int ch, int cursor)
 {
@@ -205,9 +234,9 @@ date_field_filter(newtComponent entry, void* data, int ch, int cursor)
     f->is_valid             = true;
     if (cursor >= 10) {
         switch (ch) {
+            case NEWT_KEY_UP:
+            case NEWT_KEY_DOWN:
             case NEWT_KEY_LEFT:
-                ret = NEWT_KEY_LEFT;
-                goto cleanup;
             case NEWT_KEY_BKSPC:
                 ret = NEWT_KEY_LEFT;
                 goto cleanup;
@@ -225,8 +254,21 @@ date_field_filter(newtComponent entry, void* data, int ch, int cursor)
                 goto cleanup;
         }
     }
+    if (ch == NEWT_KEY_UP) {
+        spin_date_value(entry, +1);
+        ret = NEWT_KEY_LEFT;
+        goto cleanup;
+    }
+    if (ch == NEWT_KEY_DOWN) {
+        spin_date_value(entry, -1);
+        ret = NEWT_KEY_LEFT;
+        goto cleanup;
+    }
     if (ch == NEWT_KEY_ENTER) {
-        if (is_valid_date_str(val)) return NEWT_KEY_ENTER;
+        if (is_valid_date_str(val)) {
+            ret = NEWT_KEY_ENTER;
+            goto cleanup;
+        }
     }
     if (ch == NEWT_KEY_BKSPC) ch = NEWT_KEY_LEFT;
     if (ch == NEWT_KEY_LEFT) {

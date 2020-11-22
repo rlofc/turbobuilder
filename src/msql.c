@@ -1040,7 +1040,7 @@ create_insert_statement(struct entity* e)
     sds buf2 = sdsempty();
     $foreach_hashed(struct field*, f, e->fields)
     {
-        if (f->type == AUTO) break;
+        if (f->type == AUTO) continue;
         buf  = sdscatprintf(buf, "[%s],", f->name);
         buf2 = sdscatprintf(buf2, "@%s,", f->name);
     }
@@ -1059,7 +1059,7 @@ create_update_statement(struct entity* e)
     sds tmp = sdsempty();
     $foreach_hashed(struct field*, f, e->fields)
     {
-        if (f->type == AUTO) break;
+        if (f->type == AUTO) continue;
         tmp = sdscatprintf(tmp, "[%s]=@%s,", f->name, f->name);
     }
     tmp               = sdstrim(tmp, ",");
@@ -1100,6 +1100,7 @@ bind_sql_params(struct entity_value* e, sqlite3_stmt* res, int key)
     sds     fname = sdsempty();
     $foreach_hashed(struct field_value*, f, e->fields)
     {
+        if (f->base->type == AUTO) continue;
         fname   = sdscatprintf(fname, "@%s", f->base->name);
         int idx = sqlite3_bind_parameter_index(res, fname);
         if (f->base->type == REF) {

@@ -8,6 +8,7 @@ Trainee = entity {
     Sessions = relation { ref: Session.Trainee; orderdesc: Session.Date; }
     Exercises = relation { ref: Exercise.Trainee; }
     FourWeeksAverageIntensity = field { type: auto; size: 10; listed: false;
+        bar: true;
         value: RollingDaysAvg(Sessions.AverageIntensityOfSets, Sessions.Date, 28);
     }
     AverageVolume = field { type: auto; size: 10; listed: false;
@@ -24,16 +25,18 @@ Session = entity {
         value: Get(Trainee.SetLogTypeToCount);
     }
     AverageIntensity = field { type: auto; size: 10; listed: false;
-        value: Avg(Exercises.RelativeIntensity);
+        bar: true;
+        value: Avg(Exercises.RelativeIntensity); tags: Stats;
     }
     Volume = field { type: auto; size: 10; listed: false;
-        value: Sum(Exercises.Volume);
+        value: Sum(Exercises.Volume); tags: Stats;
     }
-    AverageWeightActuallyLifted = field { type: auto; size: 10; listed: false;
-        value: Div(Sum(Exercises.Volume),Sum(Exercises.TotalReps));
+    AverageWeightLifted = field { type: auto; size: 10; listed: false;
+        value: Div(Sum(Exercises.Volume),Sum(Exercises.TotalReps)); tags: Stats;
     }
     AverageIntensityOfSets = field { type: auto; size: 10; listed: false;
-        value: Avg(Exercises.AverageIntensityOfSets);
+        bar: true;
+        value: Avg(Exercises.AverageIntensityOfSets); tags: Stats;
     }
 }
 
@@ -43,6 +46,7 @@ Exercise = entity {
     Sessions = relation { ref: SessionExercise.Exercise; orderdesc: Session.Date; }
     OneRepMax = field { type: real; size: 6; format: "%.2f"; listed: true; }
     AverageIntensity = field { type: auto; size: 10; listed: false;
+        bar: true;
         value: RollingDaysAvg(Sessions.AverageIntensityOfSets, Sessions.Date, 20);
     }
     ActualRepMax = field { type: auto; size: 10; listed: false;
@@ -70,6 +74,7 @@ SessionExercise = entity {
     Weight = field { type: real; size: 6; format: "%.2f"; listed: true; }
     SetsLog = relation { ref: SessionExerciseSetLog.Exercise;}
     RelativeIntensity = field { type: auto; size: 10; listed: false;
+        bar: true;
         value: Div(Weight, Exercise.OneRepMax);
     }
     Volume = field { type: auto; size: 10; listed: false;
@@ -82,9 +87,11 @@ SessionExercise = entity {
         value: Max(SetsLog.Weight);
     }
     MaxIntensityReached = field { type: auto; size: 10; listed: false;
+        bar: true;
         value: Max(SetsLog.Intensity);
     }
     AverageIntensityOfSets = field { type: auto; size: 10; listed: false;
+        bar: true;
         value: AvgIfEq(SetsLog.Intensity, SetsLog.Type,Session.SetLogTypeToCount);
     }
     ORM = field { type: auto; size: 10; listed: false;
@@ -102,6 +109,7 @@ SessionExerciseSetLog = entity {
         value: Mul(Weight,Reps);
     }
     Intensity = field { type: auto; size: 10; listed: false;
+        bar: true;
         value: Div(Weight,Exercise.ORM);
     }
 }

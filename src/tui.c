@@ -358,6 +358,21 @@ get_ideal_form_window_size(struct entity* e)
 }
 
 void
+post_init_fields(struct entity_value_tui* e)
+{
+    $foreach_hashed(struct field_value_tui*, f, e->fields_tui)
+    {
+        if (f->ef->base->type == AUTO && f->ef->base->bar) {
+            if (f->ef->_init_value == NULL) continue;
+            float val;
+            if (sscanf((const char *)f->ef->_init_value,"%f",&val)==1) {
+                newtScaleSet(f->field_entry, val*100);
+            }
+        }
+    }
+}
+
+void
 add_form_fields(struct entity_value_tui* e,
                 struct context*          ctx,
                 sqlite3*                 db,
@@ -386,6 +401,12 @@ add_form_fields(struct entity_value_tui* e,
               col, row, "", defv[0], " X", (char*)&(f->ef->_bool_value));
             newtCheckboxSetFlags(
               f->field_entry, NEWT_FLAG_CHECKBOX, NEWT_FLAGS_SET);
+        } else if (f->ef->base->type == AUTO && f->ef->base->bar) {
+            f->field_entry = newtScale(
+              col,
+              row,
+              f->ef->base->length,
+              100);
         } else {
             f->field_entry = newtEntry(
               col,
@@ -541,6 +562,7 @@ show_entity_form_view(struct entity_value_tui* e,
     struct context ctx;
     ctx.k = key;
     add_fields(e, &ctx, db, form);
+    post_init_fields(e);
     sds helpline = sdsempty();
     if (key > 0) {
         sdsfree(helpline);
@@ -597,11 +619,13 @@ show_entity_form_view(struct entity_value_tui* e,
                           struct field_value_tui*, f, e->fields_tui)
                         {
                             if (f->ef->base->hidden) continue;
+                            if (f->ef->base->bar) continue;
                             const char* defv = (char*)f->ef->_init_value == NULL
                                                  ? ""
                                                  : (char*)f->ef->_init_value;
                             newtEntrySet(f->field_entry, defv, 0);
                         }
+                        post_init_fields(e);
                     }
                 }
             }

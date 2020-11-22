@@ -96,6 +96,7 @@ struct field
     char*        format;
     bool         listed;
     bool         hidden;
+    bool         bar;
     struct func* filter;
     struct func* autofunc;
     struct func* autocond;

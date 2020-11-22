@@ -383,14 +383,9 @@ add_form_fields(struct entity_value_tui* e,
           (char*)f->ef->_init_value == NULL ? "" : (char*)f->ef->_init_value;
         if (f->ef->base->type == BOOLEAN) {
             f->field_entry = newtCheckbox(
-              col,
-              row,
-              "",
-              defv[0],
-              " X",
-              (char*)&(f->ef->_bool_value));
-            newtCheckboxSetFlags(f->field_entry,
-                    NEWT_FLAG_CHECKBOX, NEWT_FLAGS_SET);
+              col, row, "", defv[0], " X", (char*)&(f->ef->_bool_value));
+            newtCheckboxSetFlags(
+              f->field_entry, NEWT_FLAG_CHECKBOX, NEWT_FLAGS_SET);
         } else {
             f->field_entry = newtEntry(
               col,
